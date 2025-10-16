@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import ConversationView from './components/ConversationView'
 import Settings from './components/Settings'
+import Information from './components/Information'
 import ErrorModal from './components/ErrorModal'
 import { getCookie, setCookie } from './utils/cookies'
 import { createBrokerMessage, extractBrokerResponseText } from './utils/helpers'
@@ -175,6 +176,8 @@ function App() {
             isDisabled={isLoading}
             brokerUrl={brokerUrl}
           />
+        ) : currentView === 'information' ? (
+          <Information />
         ) : (
           <Settings brokerUrl={brokerUrl} onSaveBrokerUrl={handleSaveBrokerUrl} />
         )}
