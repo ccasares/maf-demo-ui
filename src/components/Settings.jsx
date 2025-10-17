@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import { IoCheckmarkCircle, IoAlertCircle } from 'react-icons/io5'
+import { IoCheckmarkCircle, IoAlertCircle, IoTimeOutline } from 'react-icons/io5'
 import { isValidURL } from '../utils/cookies'
 import './Settings.css'
 
-function Settings({ brokerUrl, onSaveBrokerUrl, promptDecorator, onSavePromptDecorator }) {
+function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, promptDecorator, onSavePromptDecorator }) {
   const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerUrl || '')
   const [isValid, setIsValid] = useState(true)
   const [showSuccess, setShowSuccess] = useState(false)
   const [touched, setTouched] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   
   // Prompt Decorator state
   const [decoratorEnabled, setDecoratorEnabled] = useState(promptDecorator?.enabled || false)
@@ -66,6 +67,13 @@ function Settings({ brokerUrl, onSaveBrokerUrl, promptDecorator, onSavePromptDec
 
   const canSave = url.trim() && isValid && url !== brokerUrl
 
+  const handleSelectFromHistory = (selectedUrl) => {
+    setUrl(selectedUrl)
+    setShowHistory(false)
+    setIsValid(true)
+    setTouched(true)
+  }
+
   const handleDecoratorSubmit = (e) => {
     e.preventDefault()
     
@@ -87,6 +95,20 @@ function Settings({ brokerUrl, onSaveBrokerUrl, promptDecorator, onSavePromptDec
     decoratorEnabled !== promptDecorator?.enabled ||
     decoratorText.trim() !== (promptDecorator?.text || '')
   )
+
+  const handleClearDecorator = () => {
+    setDecoratorEnabled(false)
+    setDecoratorText('')
+    onSavePromptDecorator({ enabled: false, text: '' })
+    setShowDecoratorSuccess(true)
+    
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setShowDecoratorSuccess(false)
+    }, 3000)
+  }
+
+  const hasDecoratorConfig = decoratorEnabled || decoratorText.trim()
 
   return (
     <div className="settings-container">
@@ -115,9 +137,42 @@ function Settings({ brokerUrl, onSaveBrokerUrl, promptDecorator, onSavePromptDec
       {activeTab === 'broker' && (
         <form className="settings-form" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="broker-url" className="form-label">
-            MuleSoft Agent Broker URL
-          </label>
+          <div className="label-with-history">
+            <label htmlFor="broker-url" className="form-label">
+              MuleSoft Agent Broker URL
+            </label>
+            {brokerUrlHistory && brokerUrlHistory.length > 0 && (
+              <button
+                type="button"
+                className="history-toggle"
+                onClick={() => setShowHistory(!showHistory)}
+                title="Show URL history"
+              >
+                <IoTimeOutline />
+                <span>History ({brokerUrlHistory.length})</span>
+              </button>
+            )}
+          </div>
+
+          {showHistory && brokerUrlHistory && brokerUrlHistory.length > 0 && (
+            <div className="url-history">
+              <p className="history-label">Recent URLs:</p>
+              {brokerUrlHistory.map((historyUrl, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  className={`history-item ${historyUrl === url ? 'active' : ''}`}
+                  onClick={() => handleSelectFromHistory(historyUrl)}
+                  title={historyUrl}
+                >
+                  <span className="history-url">{historyUrl}</span>
+                  {historyUrl === brokerUrl && (
+                    <span className="current-badge">Current</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
           
           <div className="input-wrapper">
             <input
@@ -218,13 +273,23 @@ function Settings({ brokerUrl, onSaveBrokerUrl, promptDecorator, onSavePromptDec
             </p>
           </div>
 
-          <button 
-            type="submit" 
-            className="save-button"
-            disabled={!canSaveDecorator}
-          >
-            Save
-          </button>
+          <div className="button-group">
+            <button 
+              type="submit" 
+              className="save-button"
+              disabled={!canSaveDecorator}
+            >
+              Save
+            </button>
+            <button 
+              type="button" 
+              className="clear-button-decorator"
+              onClick={handleClearDecorator}
+              disabled={!hasDecoratorConfig}
+            >
+              Clear
+            </button>
+          </div>
         </form>
       )}
 

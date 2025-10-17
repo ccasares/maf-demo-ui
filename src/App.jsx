@@ -4,17 +4,19 @@ import ConversationView from './components/ConversationView'
 import Settings from './components/Settings'
 import Information from './components/Information'
 import ErrorModal from './components/ErrorModal'
-import { getCookie, setCookie } from './utils/cookies'
+import { getCookie, setCookie, deleteCookie } from './utils/cookies'
 import { createBrokerMessage, extractBrokerResponseText } from './utils/helpers'
 import './App.css'
 
 const BROKER_URL_COOKIE_NAME = 'mulesoft_broker_url'
+const BROKER_URL_HISTORY_COOKIE_NAME = 'mulesoft_broker_url_history'
 const PROMPT_DECORATOR_COOKIE_NAME = 'mulesoft_prompt_decorator'
 
 function App() {
   const [currentView, setCurrentView] = useState('conversations')
   const [messages, setMessages] = useState([])
   const [brokerUrl, setBrokerUrl] = useState('')
+  const [brokerUrlHistory, setBrokerUrlHistory] = useState([])
   const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -25,6 +27,17 @@ function App() {
     const savedUrl = getCookie(BROKER_URL_COOKIE_NAME)
     if (savedUrl) {
       setBrokerUrl(savedUrl)
+    }
+
+    // Load URL history
+    const savedHistory = getCookie(BROKER_URL_HISTORY_COOKIE_NAME)
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory)
+        setBrokerUrlHistory(parsed)
+      } catch (e) {
+        console.error('Error parsing broker URL history cookie:', e)
+      }
     }
   }, [])
 
@@ -190,11 +203,22 @@ function App() {
   const handleSaveBrokerUrl = (url) => {
     setBrokerUrl(url)
     setCookie(BROKER_URL_COOKIE_NAME, url, 365) // Save for 1 year
+    
+    // Update history - add new URL if not already in history
+    const updatedHistory = [url, ...brokerUrlHistory.filter(u => u !== url)].slice(0, 10) // Keep max 10 URLs
+    setBrokerUrlHistory(updatedHistory)
+    setCookie(BROKER_URL_HISTORY_COOKIE_NAME, JSON.stringify(updatedHistory), 365)
   }
 
   const handleSavePromptDecorator = (decorator) => {
     setPromptDecorator(decorator)
-    setCookie(PROMPT_DECORATOR_COOKIE_NAME, JSON.stringify(decorator), 365) // Save for 1 year
+    
+    // If decorator is disabled and text is empty, delete the cookie
+    if (!decorator.enabled && !decorator.text.trim()) {
+      deleteCookie(PROMPT_DECORATOR_COOKIE_NAME)
+    } else {
+      setCookie(PROMPT_DECORATOR_COOKIE_NAME, JSON.stringify(decorator), 365) // Save for 1 year
+    }
   }
 
   const handleCloseErrorModal = () => {
@@ -223,7 +247,8 @@ function App() {
           <Information />
         ) : (
           <Settings 
-            brokerUrl={brokerUrl} 
+            brokerUrl={brokerUrl}
+            brokerUrlHistory={brokerUrlHistory}
             onSaveBrokerUrl={handleSaveBrokerUrl}
             promptDecorator={promptDecorator}
             onSavePromptDecorator={handleSavePromptDecorator}
