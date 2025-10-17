@@ -3,15 +3,26 @@ import { IoCheckmarkCircle, IoAlertCircle } from 'react-icons/io5'
 import { isValidURL } from '../utils/cookies'
 import './Settings.css'
 
-function Settings({ brokerUrl, onSaveBrokerUrl }) {
+function Settings({ brokerUrl, onSaveBrokerUrl, promptDecorator, onSavePromptDecorator }) {
+  const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerUrl || '')
   const [isValid, setIsValid] = useState(true)
   const [showSuccess, setShowSuccess] = useState(false)
   const [touched, setTouched] = useState(false)
+  
+  // Prompt Decorator state
+  const [decoratorEnabled, setDecoratorEnabled] = useState(promptDecorator?.enabled || false)
+  const [decoratorText, setDecoratorText] = useState(promptDecorator?.text || '')
+  const [showDecoratorSuccess, setShowDecoratorSuccess] = useState(false)
 
   useEffect(() => {
     setUrl(brokerUrl || '')
   }, [brokerUrl])
+
+  useEffect(() => {
+    setDecoratorEnabled(promptDecorator?.enabled || false)
+    setDecoratorText(promptDecorator?.text || '')
+  }, [promptDecorator])
 
   const validateUrl = (value) => {
     if (!value.trim()) {
@@ -55,6 +66,28 @@ function Settings({ brokerUrl, onSaveBrokerUrl }) {
 
   const canSave = url.trim() && isValid && url !== brokerUrl
 
+  const handleDecoratorSubmit = (e) => {
+    e.preventDefault()
+    
+    const decoratorData = {
+      enabled: decoratorEnabled,
+      text: decoratorText.trim()
+    }
+    
+    onSavePromptDecorator(decoratorData)
+    setShowDecoratorSuccess(true)
+    
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setShowDecoratorSuccess(false)
+    }, 3000)
+  }
+
+  const canSaveDecorator = (
+    decoratorEnabled !== promptDecorator?.enabled ||
+    decoratorText.trim() !== (promptDecorator?.text || '')
+  )
+
   return (
     <div className="settings-container">
       <div className="settings-header">
@@ -62,7 +95,25 @@ function Settings({ brokerUrl, onSaveBrokerUrl }) {
         <p>Application configuration</p>
       </div>
 
-      <form className="settings-form" onSubmit={handleSubmit}>
+      {/* Tabs */}
+      <div className="settings-tabs">
+        <button
+          className={`tab-button ${activeTab === 'broker' ? 'active' : ''}`}
+          onClick={() => setActiveTab('broker')}
+        >
+          Broker URL
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'decorator' ? 'active' : ''}`}
+          onClick={() => setActiveTab('decorator')}
+        >
+          Prompt Decorator
+        </button>
+      </div>
+
+      {/* Broker URL Tab */}
+      {activeTab === 'broker' && (
+        <form className="settings-form" onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="broker-url" className="form-label">
             MuleSoft Agent Broker URL
@@ -109,22 +160,98 @@ function Settings({ brokerUrl, onSaveBrokerUrl }) {
           </p>
         </div>
 
-        <button 
-          type="submit" 
-          className="save-button"
-          disabled={!canSave}
-        >
-          Save
-        </button>
-      </form>
+          <button 
+            type="submit" 
+            className="save-button"
+            disabled={!canSave}
+          >
+            Save
+          </button>
+        </form>
+      )}
 
-      {brokerUrl && (
+      {/* Prompt Decorator Tab */}
+      {activeTab === 'decorator' && (
+        <form className="settings-form" onSubmit={handleDecoratorSubmit}>
+          <div className="form-group">
+            <div className="checkbox-wrapper">
+              <input
+                id="decorator-enabled"
+                type="checkbox"
+                checked={decoratorEnabled}
+                onChange={(e) => setDecoratorEnabled(e.target.checked)}
+                className="form-checkbox"
+              />
+              <label htmlFor="decorator-enabled" className="checkbox-label">
+                Enable Prompt Decorator
+              </label>
+            </div>
+            
+            <p className="help-text">
+              When enabled, the decorator text will be appended to every message sent to the broker.
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="decorator-text" className="form-label">
+              Decorator Text
+            </label>
+            
+            <textarea
+              id="decorator-text"
+              value={decoratorText}
+              onChange={(e) => setDecoratorText(e.target.value)}
+              placeholder="Enter decorator text to append to messages..."
+              className="form-textarea"
+              rows="3"
+              disabled={!decoratorEnabled}
+            />
+            
+            {showDecoratorSuccess && (
+              <p className="success-message">
+                Prompt Decorator saved successfully
+              </p>
+            )}
+            
+            <p className="help-text">
+              This text will be added at the end of your message with a period separator.
+            </p>
+          </div>
+
+          <button 
+            type="submit" 
+            className="save-button"
+            disabled={!canSaveDecorator}
+          >
+            Save
+          </button>
+        </form>
+      )}
+
+      {/* Current Configuration */}
+      {activeTab === 'broker' && brokerUrl && (
         <div className="current-config">
           <h3>Current Configuration</h3>
           <div className="config-item">
             <span className="config-label">Broker URL:</span>
             <span className="config-value">{brokerUrl}</span>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'decorator' && promptDecorator && (
+        <div className="current-config">
+          <h3>Current Configuration</h3>
+          <div className="config-item">
+            <span className="config-label">Status:</span>
+            <span className="config-value">{promptDecorator.enabled ? 'Enabled' : 'Disabled'}</span>
+          </div>
+          {promptDecorator.text && (
+            <div className="config-item">
+              <span className="config-label">Decorator Text:</span>
+              <span className="config-value">{promptDecorator.text}</span>
+            </div>
+          )}
         </div>
       )}
     </div>

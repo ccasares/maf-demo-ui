@@ -9,11 +9,13 @@ import { createBrokerMessage, extractBrokerResponseText } from './utils/helpers'
 import './App.css'
 
 const BROKER_URL_COOKIE_NAME = 'mulesoft_broker_url'
+const PROMPT_DECORATOR_COOKIE_NAME = 'mulesoft_prompt_decorator'
 
 function App() {
   const [currentView, setCurrentView] = useState('conversations')
   const [messages, setMessages] = useState([])
   const [brokerUrl, setBrokerUrl] = useState('')
+  const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
@@ -23,6 +25,19 @@ function App() {
     const savedUrl = getCookie(BROKER_URL_COOKIE_NAME)
     if (savedUrl) {
       setBrokerUrl(savedUrl)
+    }
+  }, [])
+
+  // Load prompt decorator from cookie on app start
+  useEffect(() => {
+    const savedDecorator = getCookie(PROMPT_DECORATOR_COOKIE_NAME)
+    if (savedDecorator) {
+      try {
+        const parsed = JSON.parse(savedDecorator)
+        setPromptDecorator(parsed)
+      } catch (e) {
+        console.error('Error parsing prompt decorator cookie:', e)
+      }
     }
   }, [])
 
@@ -37,13 +52,27 @@ function App() {
       return
     }
 
-    // Add user message to canvas (right side)
+    // Apply prompt decorator if enabled
+    let messageText = text
+    if (promptDecorator.enabled && promptDecorator.text.trim()) {
+      messageText = `${text}. ${promptDecorator.text.trim()}`
+    }
+
+    // Create JSON-RPC payload with decorated text
+    const payload = createBrokerMessage(messageText)
+
+    // Add user message to canvas (right side) - showing original text without decorator
     const userMessage = {
       id: Date.now(),
       text,
       timestamp: new Date(),
       isOwn: true,
-      hasError: false
+      hasError: false,
+      debugJson: {
+        type: 'REQUEST',
+        url: brokerUrl,
+        payload: payload
+      }
     }
     setMessages(prev => [...prev, userMessage])
 
@@ -51,9 +80,6 @@ function App() {
     setIsLoading(true)
 
     try {
-      // Create JSON-RPC payload
-      const payload = createBrokerMessage(text)
-
       // Make POST request to broker
       const response = await fetch(brokerUrl, {
         method: 'POST',
@@ -87,7 +113,13 @@ function App() {
           id: Date.now() + 1,
           text: 'Empty response received. Please, try again',
           timestamp: new Date(),
-          isOwn: false
+          isOwn: false,
+          debugJson: {
+            type: 'RESPONSE',
+            status: response.status,
+            statusText: response.statusText,
+            payload: responseData
+          }
         }
         setMessages(prev => [...prev, emptyMessage])
       } else if (!responseText) {
@@ -103,7 +135,13 @@ function App() {
           id: Date.now() + 1,
           text: responseText,
           timestamp: new Date(),
-          isOwn: false
+          isOwn: false,
+          debugJson: {
+            type: 'RESPONSE',
+            status: response.status,
+            statusText: response.statusText,
+            payload: responseData
+          }
         }
         setMessages(prev => [...prev, botMessage])
       }
@@ -154,6 +192,11 @@ function App() {
     setCookie(BROKER_URL_COOKIE_NAME, url, 365) // Save for 1 year
   }
 
+  const handleSavePromptDecorator = (decorator) => {
+    setPromptDecorator(decorator)
+    setCookie(PROMPT_DECORATOR_COOKIE_NAME, JSON.stringify(decorator), 365) // Save for 1 year
+  }
+
   const handleCloseErrorModal = () => {
     setIsErrorModalOpen(false)
     setError(null)
@@ -179,7 +222,12 @@ function App() {
         ) : currentView === 'information' ? (
           <Information />
         ) : (
-          <Settings brokerUrl={brokerUrl} onSaveBrokerUrl={handleSaveBrokerUrl} />
+          <Settings 
+            brokerUrl={brokerUrl} 
+            onSaveBrokerUrl={handleSaveBrokerUrl}
+            promptDecorator={promptDecorator}
+            onSavePromptDecorator={handleSavePromptDecorator}
+          />
         )}
       </div>
       <ErrorModal 
