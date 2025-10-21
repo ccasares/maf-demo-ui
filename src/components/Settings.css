@@ -79,6 +79,12 @@
   margin: 0;
 }
 
+.history-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .history-toggle {
   background: none;
   border: 1px solid var(--border-color);
@@ -100,6 +106,37 @@
 }
 
 .history-toggle svg {
+  font-size: 1rem;
+}
+
+.clear-history-button-inline {
+  background: none;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  width: 36px;
+  height: 36px;
+}
+
+.clear-history-button-inline:hover {
+  background-color: #ef4444;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.clear-history-button-inline:active {
+  transform: translateY(0);
+}
+
+.clear-history-button-inline svg {
   font-size: 1rem;
 }
 

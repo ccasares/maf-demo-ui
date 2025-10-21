@@ -221,6 +221,11 @@ function App() {
     }
   }
 
+  const handleClearBrokerUrlHistory = () => {
+    setBrokerUrlHistory([])
+    deleteCookie(BROKER_URL_HISTORY_COOKIE_NAME)
+  }
+
   const handleCloseErrorModal = () => {
     setIsErrorModalOpen(false)
     setError(null)
@@ -250,6 +255,7 @@ function App() {
             brokerUrl={brokerUrl}
             brokerUrlHistory={brokerUrlHistory}
             onSaveBrokerUrl={handleSaveBrokerUrl}
+            onClearBrokerUrlHistory={handleClearBrokerUrlHistory}
             promptDecorator={promptDecorator}
             onSavePromptDecorator={handleSavePromptDecorator}
           />

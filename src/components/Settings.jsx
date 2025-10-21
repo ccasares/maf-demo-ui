@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { IoCheckmarkCircle, IoAlertCircle, IoTimeOutline } from 'react-icons/io5'
+import { IoCheckmarkCircle, IoAlertCircle, IoTimeOutline, IoTrashOutline } from 'react-icons/io5'
 import { isValidURL } from '../utils/cookies'
 import './Settings.css'
 
-function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, promptDecorator, onSavePromptDecorator }) {
+function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, promptDecorator, onSavePromptDecorator }) {
   const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerUrl || '')
   const [isValid, setIsValid] = useState(true)
@@ -74,6 +74,11 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, promptDecorato
     setTouched(true)
   }
 
+  const handleClearHistory = () => {
+    onClearBrokerUrlHistory()
+    setShowHistory(false)
+  }
+
   const handleDecoratorSubmit = (e) => {
     e.preventDefault()
     
@@ -142,15 +147,27 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, promptDecorato
               MuleSoft Agent Broker URL
             </label>
             {brokerUrlHistory && brokerUrlHistory.length > 0 && (
-              <button
-                type="button"
-                className="history-toggle"
-                onClick={() => setShowHistory(!showHistory)}
-                title="Show URL history"
-              >
-                <IoTimeOutline />
-                <span>History ({brokerUrlHistory.length})</span>
-              </button>
+              <div className="history-buttons">
+                <button
+                  type="button"
+                  className="history-toggle"
+                  onClick={() => setShowHistory(!showHistory)}
+                  title="Show URL history"
+                >
+                  <IoTimeOutline />
+                  <span>History ({brokerUrlHistory.length})</span>
+                </button>
+                {brokerUrlHistory.length > 1 && (
+                  <button
+                    type="button"
+                    className="clear-history-button-inline"
+                    onClick={handleClearHistory}
+                    title="Clear URL history"
+                  >
+                    <IoTrashOutline />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
