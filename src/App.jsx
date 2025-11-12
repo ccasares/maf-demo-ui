@@ -226,6 +226,17 @@ function App() {
     deleteCookie(BROKER_URL_HISTORY_COOKIE_NAME)
   }
 
+  const handleDeleteUrlFromHistory = (urlToDelete) => {
+    const updatedHistory = brokerUrlHistory.filter(url => url !== urlToDelete)
+    setBrokerUrlHistory(updatedHistory)
+    
+    if (updatedHistory.length > 0) {
+      setCookie(BROKER_URL_HISTORY_COOKIE_NAME, JSON.stringify(updatedHistory), 365)
+    } else {
+      deleteCookie(BROKER_URL_HISTORY_COOKIE_NAME)
+    }
+  }
+
   const handleCloseErrorModal = () => {
     setIsErrorModalOpen(false)
     setError(null)
@@ -256,6 +267,7 @@ function App() {
             brokerUrlHistory={brokerUrlHistory}
             onSaveBrokerUrl={handleSaveBrokerUrl}
             onClearBrokerUrlHistory={handleClearBrokerUrlHistory}
+            onDeleteUrlFromHistory={handleDeleteUrlFromHistory}
             promptDecorator={promptDecorator}
             onSavePromptDecorator={handleSavePromptDecorator}
           />

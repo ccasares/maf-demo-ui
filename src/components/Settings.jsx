@@ -3,7 +3,7 @@ import { IoCheckmarkCircle, IoAlertCircle, IoTimeOutline, IoTrashOutline } from 
 import { isValidURL } from '../utils/cookies'
 import './Settings.css'
 
-function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, promptDecorator, onSavePromptDecorator }) {
+function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator }) {
   const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerUrl || '')
   const [isValid, setIsValid] = useState(true)
@@ -77,6 +77,11 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
   const handleClearHistory = () => {
     onClearBrokerUrlHistory()
     setShowHistory(false)
+  }
+
+  const handleDeleteUrl = (e, urlToDelete) => {
+    e.stopPropagation() // Prevent selecting the URL when clicking delete
+    onDeleteUrlFromHistory(urlToDelete)
   }
 
   const handleDecoratorSubmit = (e) => {
@@ -175,18 +180,30 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
             <div className="url-history">
               <p className="history-label">Recent URLs:</p>
               {brokerUrlHistory.map((historyUrl, index) => (
-                <button
+                <div
                   key={index}
-                  type="button"
                   className={`history-item ${historyUrl === url ? 'active' : ''}`}
-                  onClick={() => handleSelectFromHistory(historyUrl)}
-                  title={historyUrl}
                 >
-                  <span className="history-url">{historyUrl}</span>
-                  {historyUrl === brokerUrl && (
-                    <span className="current-badge">Current</span>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    className="history-item-button"
+                    onClick={() => handleSelectFromHistory(historyUrl)}
+                    title={historyUrl}
+                  >
+                    <span className="history-url">{historyUrl}</span>
+                    {historyUrl === brokerUrl && (
+                      <span className="current-badge">Current</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-history-item-button"
+                    onClick={(e) => handleDeleteUrl(e, historyUrl)}
+                    title="Delete this URL from history"
+                  >
+                    <IoTrashOutline />
+                  </button>
+                </div>
               ))}
             </div>
           )}
