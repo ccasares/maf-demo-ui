@@ -21,6 +21,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
+  const [conversationContextId, setConversationContextId] = useState(null)
 
   // Cargar la URL del broker desde la cookie al iniciar la aplicación
   useEffect(() => {
@@ -71,8 +72,8 @@ function App() {
       messageText = `${text}. ${promptDecorator.text.trim()}`
     }
 
-    // Create JSON-RPC payload with decorated text
-    const payload = createBrokerMessage(messageText)
+    // Create JSON-RPC payload with decorated text and conversation context if exists
+    const payload = createBrokerMessage(messageText, conversationContextId)
 
     // Add user message to canvas (right side) - showing original text without decorator
     const userMessage = {
@@ -119,6 +120,18 @@ function App() {
       // Extract text from response
       const responseText = extractBrokerResponseText(responseData)
       
+      // Check conversation state
+      const conversationState = responseData?.result?.status?.state
+      
+      // Handle conversation context based on state
+      if (conversationState === 'input-required' && responseData?.result?.contextId) {
+        // Save contextId for next message
+        setConversationContextId(responseData.result.contextId)
+      } else if (conversationState === 'completed') {
+        // Clear contextId for next message
+        setConversationContextId(null)
+      }
+      
       // Check if response is empty
       if (responseText === '') {
         // Show generic message for empty response instead of error modal
@@ -127,6 +140,8 @@ function App() {
           text: 'Empty response received. Please, try again',
           timestamp: new Date(),
           isOwn: false,
+          conversationState: conversationState,
+          retryMessage: text,
           debugJson: {
             type: 'RESPONSE',
             status: response.status,
@@ -149,6 +164,8 @@ function App() {
           text: responseText,
           timestamp: new Date(),
           isOwn: false,
+          conversationState: conversationState,
+          retryMessage: text,
           debugJson: {
             type: 'RESPONSE',
             status: response.status,

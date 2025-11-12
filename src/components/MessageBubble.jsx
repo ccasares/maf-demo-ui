@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { IoBugOutline, IoClose } from 'react-icons/io5'
+import { IoBugOutline, IoClose, IoAlertCircleOutline, IoCheckmarkCircleOutline, IoCloseCircleOutline, IoRefreshOutline } from 'react-icons/io5'
 import './MessageBubble.css'
 
-function MessageBubble({ message }) {
+function MessageBubble({ message, onRetry }) {
   const [showDebugModal, setShowDebugModal] = useState(false)
 
   const formatTime = (date) => {
@@ -20,6 +20,13 @@ function MessageBubble({ message }) {
 
   const handleCloseModal = () => {
     setShowDebugModal(false)
+  }
+
+  const handleRetryClick = (e) => {
+    e.stopPropagation()
+    if (onRetry && message.retryMessage) {
+      onRetry(message.retryMessage)
+    }
   }
 
   return (
@@ -42,6 +49,41 @@ function MessageBubble({ message }) {
             <span className="message-time">{formatTime(message.timestamp)}</span>
           </div>
         </div>
+        
+        {!message.isOwn && message.conversationState && (
+          <div className="conversation-state-indicator">
+            {message.conversationState === 'input-required' && (
+              <div className="state-icon-wrapper" data-tooltip="Input required">
+                <IoAlertCircleOutline 
+                  className="state-icon input-required-icon"
+                />
+              </div>
+            )}
+            {message.conversationState === 'completed' && (
+              <div className="state-icon-wrapper" data-tooltip="Task completed">
+                <IoCheckmarkCircleOutline 
+                  className="state-icon completed-icon"
+                />
+              </div>
+            )}
+            {message.conversationState === 'failed' && (
+              <>
+                <div className="state-icon-wrapper" data-tooltip="Failed">
+                  <IoCloseCircleOutline 
+                    className="state-icon failed-icon"
+                  />
+                </div>
+                <button 
+                  className="retry-button"
+                  onClick={handleRetryClick}
+                  title="Retry message"
+                >
+                  <IoRefreshOutline className="retry-icon" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Debug Modal */}

@@ -2,6 +2,8 @@
   display: flex;
   margin-bottom: 0.75rem;
   animation: fadeIn 0.3s ease-in;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 @keyframes fadeIn {
@@ -90,6 +92,115 @@
   opacity: 1;
   color: var(--accent-color);
   background-color: rgba(0, 128, 255, 0.1);
+}
+
+/* Conversation state indicator - next to bubble */
+.conversation-state-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.state-icon-wrapper {
+  position: relative;
+  display: inline-flex;
+  cursor: help;
+}
+
+.state-icon {
+  font-size: 1.55rem;
+  animation: fadeIn 0.3s ease-in;
+  background-color: var(--bg-primary);
+  border-radius: 50%;
+  padding: 3px;
+}
+
+.input-required-icon {
+  color: #FFA726;
+  filter: drop-shadow(0 0 4px rgba(255, 167, 38, 0.5));
+}
+
+.completed-icon {
+  color: #66BB6A;
+  filter: drop-shadow(0 0 4px rgba(102, 187, 106, 0.5));
+}
+
+.failed-icon {
+  color: #EF5350;
+  filter: drop-shadow(0 0 4px rgba(239, 83, 80, 0.5));
+}
+
+/* Retry button - shown next to failed icon */
+.retry-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-left: 0.5rem;
+  transition: transform 0.2s ease;
+}
+
+.retry-button:hover {
+  transform: scale(1.1);
+}
+
+.retry-button:active {
+  transform: scale(0.95);
+}
+
+.retry-icon {
+  font-size: 1.55rem;
+  color: #FFFFFF;
+  background-color: var(--bg-primary);
+  border-radius: 50%;
+  padding: 3px;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.3));
+}
+
+/* Tooltip con delay de 500ms */
+.state-icon-wrapper::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background-color: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  transition-delay: 0s;
+  z-index: 1000;
+}
+
+.state-icon-wrapper::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  border: 6px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  transition-delay: 0s;
+  z-index: 1000;
+}
+
+.state-icon-wrapper:hover::after,
+.state-icon-wrapper:hover::before {
+  opacity: 1;
+  transition-delay: 500ms;
 }
 
 /* Markdown styling */

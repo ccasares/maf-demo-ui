@@ -51,7 +51,11 @@ function ConversationView({ messages, onSendMessage, onClearMessages, isLoading,
         ) : (
           <>
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+              <MessageBubble 
+                key={message.id} 
+                message={message} 
+                onRetry={onSendMessage}
+              />
             ))}
             {isLoading && <LoadingIndicator />}
           </>
