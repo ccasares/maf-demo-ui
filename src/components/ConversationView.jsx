@@ -1,12 +1,19 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { IoTrashOutline } from 'react-icons/io5'
 import MessageBubble from './MessageBubble'
 import MessageInput from './MessageInput'
 import LoadingIndicator from './LoadingIndicator'
 import './ConversationView.css'
 
-function ConversationView({ messages, onSendMessage, onClearMessages, isLoading, isDisabled, brokerUrl }) {
+const ConversationView = forwardRef(({ messages, onSendMessage, onClearMessages, isLoading, isDisabled, brokerUrl }, ref) => {
   const messagesEndRef = useRef(null)
+  const messageInputRef = useRef(null)
+
+  useImperativeHandle(ref, () => ({
+    focusInput: () => {
+      messageInputRef.current?.focus()
+    }
+  }))
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -63,13 +70,16 @@ function ConversationView({ messages, onSendMessage, onClearMessages, isLoading,
         <div ref={messagesEndRef} />
       </div>
       <MessageInput 
+        ref={messageInputRef}
         onSendMessage={onSendMessage} 
         disabled={isDisabled || !isBrokerConfigured}
         brokerUrl={brokerUrl}
       />
     </div>
   )
-}
+})
+
+ConversationView.displayName = 'ConversationView'
 
 export default ConversationView
 

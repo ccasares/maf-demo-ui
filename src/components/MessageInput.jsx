@@ -1,9 +1,16 @@
-import { useState } from 'react'
+import { useState, useRef, useImperativeHandle, forwardRef } from 'react'
 import { IoSend } from 'react-icons/io5'
 import './MessageInput.css'
 
-function MessageInput({ onSendMessage, disabled = false, brokerUrl }) {
+const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerUrl }, ref) => {
   const [text, setText] = useState('')
+  const inputRef = useRef(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef.current?.focus()
+    }
+  }))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -35,6 +42,7 @@ function MessageInput({ onSendMessage, disabled = false, brokerUrl }) {
   return (
     <form className="message-input" onSubmit={handleSubmit}>
       <input
+        ref={inputRef}
         type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -48,7 +56,9 @@ function MessageInput({ onSendMessage, disabled = false, brokerUrl }) {
       </button>
     </form>
   )
-}
+})
+
+MessageInput.displayName = 'MessageInput'
 
 export default MessageInput
 

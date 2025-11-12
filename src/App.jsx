@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import ConversationView from './components/ConversationView'
 import Settings from './components/Settings'
@@ -22,6 +22,7 @@ function App() {
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
   const [conversationContextId, setConversationContextId] = useState(null)
+  const conversationViewRef = useRef(null)
 
   // Cargar la URL del broker desde la cookie al iniciar la aplicación
   useEffect(() => {
@@ -214,6 +215,11 @@ function App() {
       
     } finally {
       setIsLoading(false)
+      
+      // Focus input after receiving response (success or error)
+      setTimeout(() => {
+        conversationViewRef.current?.focusInput()
+      }, 100)
     }
   }
 
@@ -269,6 +275,7 @@ function App() {
       <div className="main-content">
         {currentView === 'conversations' ? (
           <ConversationView 
+            ref={conversationViewRef}
             messages={messages} 
             onSendMessage={handleSendMessage}
             onClearMessages={handleClearMessages}
