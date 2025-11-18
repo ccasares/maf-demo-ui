@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { IoChatbubbleEllipsesOutline, IoSettingsOutline, IoInformationCircleOutline, IoChevronBack, IoChevronForward } from 'react-icons/io5'
 import './Sidebar.css'
 
-function Sidebar({ currentView, onViewChange }) {
+function Sidebar({ currentView, onViewChange, customLogo }) {
   const [isCollapsed, setIsCollapsed] = useState(true)
 
   const toggleSidebar = () => {
@@ -12,7 +12,11 @@ function Sidebar({ currentView, onViewChange }) {
   return (
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
-        <img src="/mulesoft_logo.png" alt="MuleSoft Logo" className="sidebar-logo" />
+        <img 
+          src={customLogo || "/mulesoft_logo.png"} 
+          alt="MuleSoft Logo" 
+          className="sidebar-logo" 
+        />
         {!isCollapsed && <h1>MuleSoft Agent Fabric</h1>}
       </div>
           <nav className="sidebar-menu">

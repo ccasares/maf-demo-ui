@@ -5,7 +5,7 @@ import MessageInput from './MessageInput'
 import LoadingIndicator from './LoadingIndicator'
 import './ConversationView.css'
 
-const ConversationView = forwardRef(({ messages, onSendMessage, onClearMessages, isLoading, isDisabled, brokerConfig }, ref) => {
+const ConversationView = forwardRef(({ messages, onSendMessage, onClearMessages, isLoading, isDisabled, brokerConfig, conversationTitle }, ref) => {
   const messagesEndRef = useRef(null)
   const messageInputRef = useRef(null)
 
@@ -28,7 +28,7 @@ const ConversationView = forwardRef(({ messages, onSendMessage, onClearMessages,
   return (
     <div className="conversation-view">
       <div className="conversation-header">
-        <h2>Conversation</h2>
+        <h2>{conversationTitle || 'Conversation'}</h2>
         <button 
           className="clear-button" 
           onClick={onClearMessages}

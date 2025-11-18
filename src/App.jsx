@@ -6,11 +6,13 @@ import Information from './components/Information'
 import ErrorModal from './components/ErrorModal'
 import { getCookie, setCookie, deleteCookie } from './utils/cookies'
 import { createBrokerMessage, extractBrokerResponseText } from './utils/helpers'
+import { generateColorScheme, applyColorScheme, resetColorScheme } from './utils/colorUtils'
 import './App.css'
 
 const BROKER_URL_COOKIE_NAME = 'mulesoft_broker_url'
 const BROKER_URL_HISTORY_COOKIE_NAME = 'mulesoft_broker_url_history'
 const PROMPT_DECORATOR_COOKIE_NAME = 'mulesoft_prompt_decorator'
+const CUSTOMIZATION_COOKIE_NAME = 'mulesoft_customization'
 
 function App() {
   const [currentView, setCurrentView] = useState('conversations')
@@ -18,6 +20,7 @@ function App() {
   const [brokerConfig, setBrokerConfig] = useState({ url: '', name: '' })
   const [brokerUrlHistory, setBrokerUrlHistory] = useState([])
   const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
+  const [customization, setCustomization] = useState({ logo: null, title: 'Conversation', colorScheme: null })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
@@ -64,6 +67,31 @@ function App() {
       }
     }
   }, [])
+
+  // Load customization from cookie on app start
+  useEffect(() => {
+    const savedCustomization = getCookie(CUSTOMIZATION_COOKIE_NAME)
+    if (savedCustomization) {
+      try {
+        const parsed = JSON.parse(savedCustomization)
+        setCustomization(parsed)
+      } catch (e) {
+        console.error('Error parsing customization cookie:', e)
+      }
+    }
+  }, [])
+
+  // Apply color scheme when customization changes
+  useEffect(() => {
+    if (customization.colorScheme) {
+      const scheme = generateColorScheme(customization.colorScheme)
+      if (scheme) {
+        applyColorScheme(scheme)
+      }
+    } else {
+      resetColorScheme()
+    }
+  }, [customization.colorScheme])
 
   const handleSendMessage = async (text) => {
     // Check if broker URL is configured
@@ -272,6 +300,11 @@ function App() {
     }
   }
 
+  const handleSaveCustomization = (customizationData) => {
+    setCustomization(customizationData)
+    setCookie(CUSTOMIZATION_COOKIE_NAME, JSON.stringify(customizationData), 365)
+  }
+
   const handleCloseErrorModal = () => {
     setIsErrorModalOpen(false)
     setError(null)
@@ -283,7 +316,11 @@ function App() {
 
   return (
     <div className="app">
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+      <Sidebar 
+        currentView={currentView} 
+        onViewChange={setCurrentView} 
+        customLogo={customization.logo}
+      />
       <div className="main-content">
         {currentView === 'conversations' ? (
           <ConversationView 
@@ -294,6 +331,7 @@ function App() {
             isLoading={isLoading}
             isDisabled={isLoading}
             brokerConfig={brokerConfig}
+            conversationTitle={customization.title}
           />
         ) : currentView === 'information' ? (
           <Information />
@@ -306,6 +344,8 @@ function App() {
             onDeleteUrlFromHistory={handleDeleteUrlFromHistory}
             promptDecorator={promptDecorator}
             onSavePromptDecorator={handleSavePromptDecorator}
+            customization={customization}
+            onSaveCustomization={handleSaveCustomization}
           />
         )}
       </div>

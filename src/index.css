@@ -8,6 +8,7 @@
   --primary-color: #0052CC;
   --secondary-color: #0065FF;
   --accent-color: #0080FF;
+  --accent-hover: #1E90FF;
   --bg-primary: #0A1929;
   --bg-secondary: #132F4C;
   --bg-tertiary: #1E4976;
@@ -16,6 +17,7 @@
   --message-own: #1565C0;
   --message-other: #1E3A5F;
   --border-color: #2E5C8A;
+  --error-color: #e74c3c;
 }
 
 body {
