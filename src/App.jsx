@@ -15,7 +15,7 @@ const PROMPT_DECORATOR_COOKIE_NAME = 'mulesoft_prompt_decorator'
 function App() {
   const [currentView, setCurrentView] = useState('conversations')
   const [messages, setMessages] = useState([])
-  const [brokerUrl, setBrokerUrl] = useState('')
+  const [brokerConfig, setBrokerConfig] = useState({ url: '', name: '' })
   const [brokerUrlHistory, setBrokerUrlHistory] = useState([])
   const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
   const [isLoading, setIsLoading] = useState(false)
@@ -26,9 +26,18 @@ function App() {
 
   // Cargar la URL del broker desde la cookie al iniciar la aplicación
   useEffect(() => {
-    const savedUrl = getCookie(BROKER_URL_COOKIE_NAME)
-    if (savedUrl) {
-      setBrokerUrl(savedUrl)
+    const savedBroker = getCookie(BROKER_URL_COOKIE_NAME)
+    if (savedBroker) {
+      try {
+        // Try to parse as JSON object (new format)
+        const parsed = JSON.parse(savedBroker)
+        if (parsed.url) {
+          setBrokerConfig(parsed)
+        }
+      } catch (e) {
+        // Fallback to old string format
+        setBrokerConfig({ url: savedBroker, name: '' })
+      }
     }
 
     // Load URL history
@@ -58,7 +67,7 @@ function App() {
 
   const handleSendMessage = async (text) => {
     // Check if broker URL is configured
-    if (!brokerUrl) {
+    if (!brokerConfig.url) {
       setError({
         message: 'Broker URL not configured',
         details: 'Please configure the MuleSoft Agent Broker URL in Settings before sending messages.'
@@ -85,7 +94,7 @@ function App() {
       hasError: false,
       debugJson: {
         type: 'REQUEST',
-        url: brokerUrl,
+        url: brokerConfig.url,
         payload: payload
       }
     }
@@ -96,7 +105,7 @@ function App() {
 
     try {
       // Make POST request to broker
-      const response = await fetch(brokerUrl, {
+      const response = await fetch(brokerConfig.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -223,12 +232,15 @@ function App() {
     }
   }
 
-  const handleSaveBrokerUrl = (url) => {
-    setBrokerUrl(url)
-    setCookie(BROKER_URL_COOKIE_NAME, url, 365) // Save for 1 year
+  const handleSaveBrokerUrl = (config) => {
+    setBrokerConfig(config)
+    setCookie(BROKER_URL_COOKIE_NAME, JSON.stringify(config), 365) // Save for 1 year
     
-    // Update history - add new URL if not already in history
-    const updatedHistory = [url, ...brokerUrlHistory.filter(u => u !== url)].slice(0, 10) // Keep max 10 URLs
+    // Update history - add new config if not already in history (check by URL)
+    const updatedHistory = [
+      config, 
+      ...brokerUrlHistory.filter(item => item.url !== config.url)
+    ].slice(0, 10) // Keep max 10 URLs
     setBrokerUrlHistory(updatedHistory)
     setCookie(BROKER_URL_HISTORY_COOKIE_NAME, JSON.stringify(updatedHistory), 365)
   }
@@ -250,7 +262,7 @@ function App() {
   }
 
   const handleDeleteUrlFromHistory = (urlToDelete) => {
-    const updatedHistory = brokerUrlHistory.filter(url => url !== urlToDelete)
+    const updatedHistory = brokerUrlHistory.filter(item => item.url !== urlToDelete)
     setBrokerUrlHistory(updatedHistory)
     
     if (updatedHistory.length > 0) {
@@ -281,13 +293,13 @@ function App() {
             onClearMessages={handleClearMessages}
             isLoading={isLoading}
             isDisabled={isLoading}
-            brokerUrl={brokerUrl}
+            brokerConfig={brokerConfig}
           />
         ) : currentView === 'information' ? (
           <Information />
         ) : (
           <Settings 
-            brokerUrl={brokerUrl}
+            brokerConfig={brokerConfig}
             brokerUrlHistory={brokerUrlHistory}
             onSaveBrokerUrl={handleSaveBrokerUrl}
             onClearBrokerUrlHistory={handleClearBrokerUrlHistory}

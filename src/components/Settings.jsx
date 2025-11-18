@@ -3,9 +3,10 @@ import { IoCheckmarkCircle, IoAlertCircle, IoTimeOutline, IoTrashOutline } from 
 import { isValidURL } from '../utils/cookies'
 import './Settings.css'
 
-function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator }) {
+function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator }) {
   const [activeTab, setActiveTab] = useState('broker')
-  const [url, setUrl] = useState(brokerUrl || '')
+  const [url, setUrl] = useState(brokerConfig?.url || '')
+  const [name, setName] = useState(brokerConfig?.name || '')
   const [isValid, setIsValid] = useState(true)
   const [showSuccess, setShowSuccess] = useState(false)
   const [touched, setTouched] = useState(false)
@@ -17,8 +18,9 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
   const [showDecoratorSuccess, setShowDecoratorSuccess] = useState(false)
 
   useEffect(() => {
-    setUrl(brokerUrl || '')
-  }, [brokerUrl])
+    setUrl(brokerConfig?.url || '')
+    setName(brokerConfig?.name || '')
+  }, [brokerConfig])
 
   useEffect(() => {
     setDecoratorEnabled(promptDecorator?.enabled || false)
@@ -55,7 +57,7 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
     setIsValid(valid)
     
     if (valid && url.trim()) {
-      onSaveBrokerUrl(url.trim())
+      onSaveBrokerUrl({ url: url.trim(), name: name.trim() })
       setShowSuccess(true)
       
       // Hide success message after 3 seconds
@@ -65,10 +67,11 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
     }
   }
 
-  const canSave = url.trim() && isValid && url !== brokerUrl
+  const canSave = url.trim() && isValid && (url !== brokerConfig?.url || name !== brokerConfig?.name)
 
-  const handleSelectFromHistory = (selectedUrl) => {
-    setUrl(selectedUrl)
+  const handleSelectFromHistory = (historyItem) => {
+    setUrl(historyItem.url)
+    setName(historyItem.name || '')
     setShowHistory(false)
     setIsValid(true)
     setTouched(true)
@@ -178,27 +181,30 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
 
           {showHistory && brokerUrlHistory && brokerUrlHistory.length > 0 && (
             <div className="url-history">
-              <p className="history-label">Recent URLs:</p>
-              {brokerUrlHistory.map((historyUrl, index) => (
+              <p className="history-label">Recent Brokers:</p>
+              {brokerUrlHistory.map((historyItem, index) => (
                 <div
                   key={index}
-                  className={`history-item ${historyUrl === url ? 'active' : ''}`}
+                  className={`history-item ${historyItem.url === url ? 'active' : ''}`}
                 >
                   <button
                     type="button"
                     className="history-item-button"
-                    onClick={() => handleSelectFromHistory(historyUrl)}
-                    title={historyUrl}
+                    onClick={() => handleSelectFromHistory(historyItem)}
+                    title={`${historyItem.name || 'Unnamed'}: ${historyItem.url}`}
                   >
-                    <span className="history-url">{historyUrl}</span>
-                    {historyUrl === brokerUrl && (
+                    <div className="history-item-content">
+                      {historyItem.name && <span className="history-name">{historyItem.name}</span>}
+                      <span className="history-url">{historyItem.url}</span>
+                    </div>
+                    {historyItem.url === brokerConfig?.url && (
                       <span className="current-badge">Current</span>
                     )}
                   </button>
                   <button
                     type="button"
                     className="delete-history-item-button"
-                    onClick={(e) => handleDeleteUrl(e, historyUrl)}
+                    onClick={(e) => handleDeleteUrl(e, historyItem.url)}
                     title="Delete this URL from history"
                   >
                     <IoTrashOutline />
@@ -208,28 +214,40 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
             </div>
           )}
           
-          <div className="input-wrapper">
-            <input
-              id="broker-url"
-              type="text"
-              value={url}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              placeholder="https://example.com/broker"
-              className={`form-input ${!isValid && touched ? 'error' : ''} ${showSuccess ? 'success' : ''}`}
-            />
-            
-            {!isValid && touched && (
-              <div className="input-icon error-icon">
-                <IoAlertCircle />
-              </div>
-            )}
-            
-            {showSuccess && (
-              <div className="input-icon success-icon">
-                <IoCheckmarkCircle />
-              </div>
-            )}
+          <div className="form-row">
+            <div className="input-wrapper">
+              <label htmlFor="broker-name" className="inline-label">Name</label>
+              <input
+                id="broker-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Broker name"
+                className="form-input"
+              />
+            </div>
+            <div className="input-wrapper">
+              <label htmlFor="broker-url" className="inline-label">URL</label>
+              <input
+                id="broker-url"
+                type="text"
+                value={url}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                placeholder="https://example.com/broker"
+                className={`form-input ${!isValid && touched ? 'error' : ''} ${showSuccess ? 'success' : ''}`}
+              />
+              {!isValid && touched && (
+                <div className="input-icon error-icon">
+                  <IoAlertCircle />
+                </div>
+              )}
+              {showSuccess && (
+                <div className="input-icon success-icon">
+                  <IoCheckmarkCircle />
+                </div>
+              )}
+            </div>
           </div>
           
           {!isValid && touched && (
@@ -328,12 +346,20 @@ function Settings({ brokerUrl, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerU
       )}
 
       {/* Current Configuration */}
-      {activeTab === 'broker' && brokerUrl && (
+      {activeTab === 'broker' && brokerConfig?.url && (
         <div className="current-config">
           <h3>Current Configuration</h3>
-          <div className="config-item">
-            <span className="config-label">Broker URL:</span>
-            <span className="config-value">{brokerUrl}</span>
+          <div className="config-row">
+            {brokerConfig.name && (
+              <div className="config-item config-item-name">
+                <span className="config-label">Broker Name:</span>
+                <span className="config-value">{brokerConfig.name}</span>
+              </div>
+            )}
+            <div className="config-item config-item-url">
+              <span className="config-label">Broker URL:</span>
+              <span className="config-value">{brokerConfig.url}</span>
+            </div>
           </div>
         </div>
       )}

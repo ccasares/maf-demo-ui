@@ -2,7 +2,7 @@ import { useState, useRef, useImperativeHandle, forwardRef } from 'react'
 import { IoSend } from 'react-icons/io5'
 import './MessageInput.css'
 
-const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerUrl }, ref) => {
+const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig }, ref) => {
   const [text, setText] = useState('')
   const inputRef = useRef(null)
 
@@ -27,7 +27,7 @@ const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerUrl },
     }
   }
 
-  const isBrokerConfigured = brokerUrl && brokerUrl.trim() !== ''
+  const isBrokerConfigured = brokerConfig?.url && brokerConfig.url.trim() !== ''
   
   const getPlaceholder = () => {
     if (!isBrokerConfigured) {
@@ -40,21 +40,28 @@ const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerUrl },
   }
 
   return (
-    <form className="message-input" onSubmit={handleSubmit}>
-      <input
-        ref={inputRef}
-        type="text"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyPress={handleKeyPress}
-        placeholder={getPlaceholder()}
-        className="input-field"
-        disabled={disabled}
-      />
-      <button type="submit" className="send-button" disabled={!text.trim() || disabled}>
-        <IoSend />
-      </button>
-    </form>
+    <div className="message-input-container">
+      {isBrokerConfigured && brokerConfig.name && (
+        <div className="broker-indicator">
+          Current broker: <strong>{brokerConfig.name}</strong>
+        </div>
+      )}
+      <form className="message-input" onSubmit={handleSubmit}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder={getPlaceholder()}
+          className="input-field"
+          disabled={disabled}
+        />
+        <button type="submit" className="send-button" disabled={!text.trim() || disabled}>
+          <IoSend />
+        </button>
+      </form>
+    </div>
   )
 })
 
