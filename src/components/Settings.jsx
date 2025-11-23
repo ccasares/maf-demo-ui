@@ -4,7 +4,7 @@ import { isValidURL } from '../utils/cookies'
 import { generateColorScheme } from '../utils/colorUtils'
 import './Settings.css'
 
-function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator, customization, onSaveCustomization }) {
+function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator, customization, onSaveCustomization, wsConfig, onSaveWsConfig, isWsConnected, isWsReconnecting, onWsConnect, onWsDisconnect }) {
   const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerConfig?.url || '')
   const [name, setName] = useState(brokerConfig?.name || '')
@@ -25,6 +25,13 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   const [logoError, setLogoError] = useState(null)
   const [showDecoratorSuccess, setShowDecoratorSuccess] = useState(false)
 
+  // WebSocket state
+  const [wsUri, setWsUri] = useState(wsConfig?.uri || '')
+  const [wsConnectOnStart, setWsConnectOnStart] = useState(wsConfig?.connectOnStart || false)
+  const [wsUriValid, setWsUriValid] = useState(true)
+  const [wsUriTouched, setWsUriTouched] = useState(false)
+  const [showWsSuccess, setShowWsSuccess] = useState(false)
+
   useEffect(() => {
     setUrl(brokerConfig?.url || '')
     setName(brokerConfig?.name || '')
@@ -40,6 +47,11 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
     setCustomTitle(customization?.title || 'Conversation')
     setCustomColorScheme(customization?.colorScheme || '')
   }, [customization])
+
+  useEffect(() => {
+    setWsUri(wsConfig?.uri || '')
+    setWsConnectOnStart(wsConfig?.connectOnStart || false)
+  }, [wsConfig])
 
   const validateUrl = (value) => {
     if (!value.trim()) {
@@ -188,6 +200,52 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
     (customColorScheme.trim() || null) !== (customization?.colorScheme || null)
   )
 
+  // WebSocket validation and handlers
+  const validateWsUri = (value) => {
+    if (!value.trim()) {
+      return true // Allow empty field
+    }
+    return value.startsWith('ws://') || value.startsWith('wss://')
+  }
+
+  const handleWsUriChange = (e) => {
+    const value = e.target.value
+    setWsUri(value)
+    setShowWsSuccess(false)
+    
+    if (wsUriTouched) {
+      setWsUriValid(validateWsUri(value))
+    }
+  }
+
+  const handleWsUriBlur = () => {
+    setWsUriTouched(true)
+    setWsUriValid(validateWsUri(wsUri))
+  }
+
+  const handleWsSubmit = (e) => {
+    e.preventDefault()
+    setWsUriTouched(true)
+    
+    const valid = validateWsUri(wsUri)
+    setWsUriValid(valid)
+    
+    if (valid) {
+      onSaveWsConfig({ uri: wsUri.trim(), connectOnStart: wsConnectOnStart })
+      setShowWsSuccess(true)
+      
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        setShowWsSuccess(false)
+      }, 3000)
+    }
+  }
+
+  const canSaveWs = (
+    wsUri.trim() !== (wsConfig?.uri || '') ||
+    wsConnectOnStart !== (wsConfig?.connectOnStart || false)
+  ) && wsUriValid
+
   return (
     <div className="settings-container">
       <div className="settings-header">
@@ -208,6 +266,15 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
           onClick={() => setActiveTab('decorator')}
         >
           Prompt Decorator
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'websockets' ? 'active' : ''}`}
+          onClick={() => setActiveTab('websockets')}
+        >
+          <span>WebSockets</span>
+          <span className={`ws-status-indicator-tab ${
+            isWsReconnecting ? 'reconnecting' : (isWsConnected ? 'connected' : 'disconnected')
+          }`}></span>
         </button>
         <button
           className={`tab-button ${activeTab === 'customize' ? 'active' : ''}`}
@@ -416,6 +483,112 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
         </form>
       )}
 
+      {/* WebSockets Tab */}
+      {activeTab === 'websockets' && (
+        <form className="settings-form" onSubmit={handleWsSubmit}>
+          <div className="form-group">
+            <label htmlFor="ws-uri" className="form-label">
+              WebSocket Server URI
+            </label>
+            
+            <input
+              id="ws-uri"
+              type="text"
+              value={wsUri}
+              onChange={handleWsUriChange}
+              onBlur={handleWsUriBlur}
+              placeholder="ws://localhost:8081/ws/in"
+              className={`form-input ${!wsUriValid && wsUriTouched ? 'error' : ''} ${showWsSuccess ? 'success' : ''}`}
+            />
+            
+            {!wsUriValid && wsUriTouched && (
+              <div className="input-icon error-icon">
+                <IoAlertCircle />
+              </div>
+            )}
+            {showWsSuccess && (
+              <div className="input-icon success-icon">
+                <IoCheckmarkCircle />
+              </div>
+            )}
+            
+            {!wsUriValid && wsUriTouched && (
+              <p className="error-message">
+                Please enter a valid WebSocket URI (must start with ws:// or wss://)
+              </p>
+            )}
+            
+            {showWsSuccess && (
+              <p className="success-message">
+                WebSocket configuration saved successfully
+              </p>
+            )}
+            
+            <p className="help-text">
+              Enter the WebSocket server URI. Must start with ws:// or wss://.
+            </p>
+          </div>
+
+          <div className="form-group">
+            <div className="checkbox-wrapper">
+              <input
+                id="ws-connect-on-start"
+                type="checkbox"
+                checked={wsConnectOnStart}
+                onChange={(e) => setWsConnectOnStart(e.target.checked)}
+                className="form-checkbox"
+              />
+              <label htmlFor="ws-connect-on-start" className="checkbox-label">
+                Connect on start
+              </label>
+            </div>
+            
+            <p className="help-text">
+              When enabled, the WebSocket connection will be automatically established when the application starts.
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Connection Control</label>
+            <div className="button-group">
+              <button 
+                type="button" 
+                className="connect-button"
+                onClick={() => onWsConnect()}
+                disabled={isWsConnected || !wsUri.trim() || !wsUriValid}
+              >
+                Connect
+              </button>
+              <button 
+                type="button" 
+                className="disconnect-button"
+                onClick={onWsDisconnect}
+                disabled={!isWsConnected}
+              >
+                Disconnect
+              </button>
+            </div>
+            
+            <div className="connection-status">
+              <span className={`status-dot ${
+                isWsReconnecting ? 'reconnecting' : (isWsConnected ? 'connected' : 'disconnected')
+              }`}></span>
+              <span className="status-text">
+                {isWsReconnecting ? 'Reconnecting...' : (isWsConnected ? 'Connected' : 'Disconnected')}
+              </span>
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            className="save-button"
+            disabled={!canSaveWs}
+          >
+            Save
+          </button>
+        </form>
+      )}
+
       {/* Customize Tab */}
       {activeTab === 'customize' && (
         <form className="settings-form" onSubmit={handleCustomizeSubmit}>
@@ -612,6 +785,32 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
               <span className="config-value">{promptDecorator.text}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'websockets' && wsConfig && (
+        <div className="current-config">
+          <h3>Current Configuration</h3>
+          {wsConfig.uri && (
+            <div className="config-item">
+              <span className="config-label">WebSocket URI:</span>
+              <span className="config-value">{wsConfig.uri}</span>
+            </div>
+          )}
+          <div className="config-item">
+            <span className="config-label">Connect on Start:</span>
+            <span className="config-value">{wsConfig.connectOnStart ? 'Yes' : 'No'}</span>
+          </div>
+          <div className="config-item">
+            <span className="config-label">Connection Status:</span>
+            <span className="config-value">
+              <span className={`status-badge ${
+                isWsReconnecting ? 'reconnecting' : (isWsConnected ? 'connected' : 'disconnected')
+              }`}>
+                {isWsReconnecting ? 'Reconnecting...' : (isWsConnected ? 'Connected' : 'Disconnected')}
+              </span>
+            </span>
+          </div>
         </div>
       )}
 

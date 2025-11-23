@@ -5,7 +5,7 @@ import MessageInput from './MessageInput'
 import LoadingIndicator from './LoadingIndicator'
 import './ConversationView.css'
 
-const ConversationView = forwardRef(({ messages, onSendMessage, onClearMessages, isLoading, isDisabled, brokerConfig, conversationTitle }, ref) => {
+const ConversationView = forwardRef(({ messages, onSendMessage, onClearMessages, isLoading, isDisabled, brokerConfig, conversationTitle, wsText, isWsConnected, isWsReconnecting }, ref) => {
   const messagesEndRef = useRef(null)
   const messageInputRef = useRef(null)
 
@@ -74,6 +74,9 @@ const ConversationView = forwardRef(({ messages, onSendMessage, onClearMessages,
         onSendMessage={onSendMessage} 
         disabled={isDisabled || !isBrokerConfigured}
         brokerConfig={brokerConfig}
+        wsText={wsText}
+        isWsConnected={isWsConnected}
+        isWsReconnecting={isWsReconnecting}
       />
     </div>
   )

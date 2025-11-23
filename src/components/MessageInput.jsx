@@ -2,7 +2,7 @@ import { useState, useRef, useImperativeHandle, forwardRef } from 'react'
 import { IoSend } from 'react-icons/io5'
 import './MessageInput.css'
 
-const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig }, ref) => {
+const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig, wsText = '', isWsConnected = false, isWsReconnecting = false }, ref) => {
   const [text, setText] = useState('')
   const inputRef = useRef(null)
 
@@ -41,9 +41,21 @@ const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig
 
   return (
     <div className="message-input-container">
-      {isBrokerConfigured && brokerConfig.name && (
-        <div className="broker-indicator">
-          Current broker: <strong>{brokerConfig.name}</strong>
+      {(isBrokerConfigured || wsText) && (
+        <div className="status-indicators">
+          {isBrokerConfigured && brokerConfig.name && (
+            <div className="broker-indicator">
+              Current broker: <strong>{brokerConfig.name}</strong>
+            </div>
+          )}
+          <div className="ws-status-indicator">
+            <span className={`ws-status-dot ${
+              isWsReconnecting ? 'reconnecting' : (isWsConnected ? 'connected' : 'disconnected')
+            }`}></span>
+            <span className="ws-status-text">
+              WebSocket: {isWsReconnecting ? 'Reconnecting...' : (isWsConnected ? 'Connected' : 'Disconnected')}
+            </span>
+          </div>
         </div>
       )}
       <form className="message-input" onSubmit={handleSubmit}>
@@ -61,6 +73,19 @@ const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig
           <IoSend />
         </button>
       </form>
+      
+      {/* WebSocket Messages Display */}
+      {wsText && (
+        <div className="websocket-section">
+          <input
+            type="text"
+            value={wsText}
+            readOnly
+            placeholder="WebSocket messages will appear here..."
+            className="ws-input-field"
+          />
+        </div>
+      )}
     </div>
   )
 })

@@ -41,6 +41,9 @@
   transition: all 0.2s ease;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .tab-button:hover {
@@ -51,6 +54,39 @@
 .tab-button.active {
   color: var(--accent-color);
   border-bottom-color: var(--accent-color);
+}
+
+.ws-status-indicator-tab {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.ws-status-indicator-tab.connected {
+  background-color: #4caf50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+  animation: pulse-tab 2s ease-in-out infinite;
+}
+
+.ws-status-indicator-tab.reconnecting {
+  background-color: #ff9800;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.8);
+  animation: pulse-tab 1s ease-in-out infinite;
+}
+
+.ws-status-indicator-tab.disconnected {
+  background-color: #e74c3c;
+  box-shadow: 0 0 4px rgba(231, 76, 60, 0.6);
+}
+
+@keyframes pulse-tab {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(76, 175, 80, 1);
+  }
 }
 
 .settings-form {
@@ -843,6 +879,129 @@
   .palette-swatch {
     width: 50px;
     height: 50px;
+  }
+}
+
+/* WebSocket Connection Control */
+.connect-button,
+.disconnect-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.connect-button {
+  background-color: #4caf50;
+  color: white;
+}
+
+.connect-button:hover:not(:disabled) {
+  background-color: #45a049;
+  transform: scale(1.02);
+}
+
+.connect-button:disabled {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.disconnect-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.disconnect-button:hover:not(:disabled) {
+  background-color: #d32f2f;
+  transform: scale(1.02);
+}
+
+.disconnect-button:disabled {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.status-dot.connected {
+  background-color: #4caf50;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
+  animation: pulse-status 2s ease-in-out infinite;
+}
+
+.status-dot.reconnecting {
+  background-color: #ff9800;
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.8);
+  animation: pulse-status 1s ease-in-out infinite;
+}
+
+.status-dot.disconnected {
+  background-color: #e74c3c;
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.6);
+}
+
+.status-text {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.connected {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+  border: 1px solid #4caf50;
+}
+
+.status-badge.reconnecting {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+  border: 1px solid #ff9800;
+}
+
+.status-badge.disconnected {
+  background-color: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+  border: 1px solid #e74c3c;
+}
+
+@keyframes pulse-status {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(76, 175, 80, 1);
   }
 }
 

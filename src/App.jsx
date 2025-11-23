@@ -5,7 +5,7 @@ import Settings from './components/Settings'
 import Information from './components/Information'
 import ErrorModal from './components/ErrorModal'
 import { getCookie, setCookie, deleteCookie } from './utils/cookies'
-import { createBrokerMessage, extractBrokerResponseText } from './utils/helpers'
+import { createBrokerMessage, extractBrokerResponseText, generateUUID } from './utils/helpers'
 import { generateColorScheme, applyColorScheme, resetColorScheme } from './utils/colorUtils'
 import './App.css'
 
@@ -13,19 +13,34 @@ const BROKER_URL_COOKIE_NAME = 'mulesoft_broker_url'
 const BROKER_URL_HISTORY_COOKIE_NAME = 'mulesoft_broker_url_history'
 const PROMPT_DECORATOR_COOKIE_NAME = 'mulesoft_prompt_decorator'
 const CUSTOMIZATION_COOKIE_NAME = 'mulesoft_customization'
+const WEBSOCKET_CONFIG_COOKIE_NAME = 'mulesoft_websocket_config'
 
 function App() {
+  // Generate session ID once on app initialization (persists only in memory)
+  const [sessionId] = useState(() => {
+    const id = generateUUID()
+    console.log('🔐 Session ID generated:', id)
+    return id
+  })
   const [currentView, setCurrentView] = useState('conversations')
   const [messages, setMessages] = useState([])
   const [brokerConfig, setBrokerConfig] = useState({ url: '', name: '' })
   const [brokerUrlHistory, setBrokerUrlHistory] = useState([])
   const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
   const [customization, setCustomization] = useState({ logo: null, title: 'Conversation', colorScheme: null })
+  const [wsConfig, setWsConfig] = useState({ uri: '', connectOnStart: false })
+  const [isWsConnected, setIsWsConnected] = useState(false)
+  const [isWsReconnecting, setIsWsReconnecting] = useState(false)
+  const [wsText, setWsText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
   const [conversationContextId, setConversationContextId] = useState(null)
   const conversationViewRef = useRef(null)
+  const wsRef = useRef(null)
+  const wsReconnectAttempts = useRef(0)
+  const wsReconnectTimer = useRef(null)
+  const wsIntentionalDisconnect = useRef(false)
 
   // Cargar la URL del broker desde la cookie al iniciar la aplicación
   useEffect(() => {
@@ -81,6 +96,44 @@ function App() {
     }
   }, [])
 
+  // Load WebSocket config from cookie on app start
+  useEffect(() => {
+    const savedWsConfig = getCookie(WEBSOCKET_CONFIG_COOKIE_NAME)
+    if (savedWsConfig) {
+      try {
+        const parsed = JSON.parse(savedWsConfig)
+        setWsConfig(parsed)
+        
+        // Auto-connect if connectOnStart is enabled
+        if (parsed.connectOnStart && parsed.uri) {
+          // Delay connection to ensure everything is loaded
+          setTimeout(() => {
+            wsIntentionalDisconnect.current = false
+            handleWsConnect(parsed.uri)
+          }, 500)
+        }
+      } catch (e) {
+        console.error('Error parsing WebSocket config cookie:', e)
+      }
+    }
+  }, [])
+
+  // Clean up WebSocket connection and reconnection timer on unmount
+  useEffect(() => {
+    return () => {
+      // Clear reconnection timer
+      if (wsReconnectTimer.current) {
+        clearTimeout(wsReconnectTimer.current)
+      }
+      
+      // Close WebSocket connection
+      if (wsRef.current) {
+        wsIntentionalDisconnect.current = true
+        wsRef.current.close()
+      }
+    }
+  }, [])
+
   // Apply color scheme when customization changes
   useEffect(() => {
     if (customization.colorScheme) {
@@ -110,8 +163,8 @@ function App() {
       messageText = `${text}. ${promptDecorator.text.trim()}`
     }
 
-    // Create JSON-RPC payload with decorated text and conversation context if exists
-    const payload = createBrokerMessage(messageText, conversationContextId)
+    // Create JSON-RPC payload with decorated text, conversation context, and session ID
+    const payload = createBrokerMessage(messageText, conversationContextId, sessionId)
 
     // Add user message to canvas (right side) - showing original text without decorator
     const userMessage = {
@@ -305,6 +358,145 @@ function App() {
     setCookie(CUSTOMIZATION_COOKIE_NAME, JSON.stringify(customizationData), 365)
   }
 
+  const handleSaveWsConfig = (config) => {
+    setWsConfig(config)
+    setCookie(WEBSOCKET_CONFIG_COOKIE_NAME, JSON.stringify(config), 365)
+  }
+
+  const handleWsConnect = (uri = wsConfig.uri, isReconnect = false) => {
+    if (isWsConnected && wsRef.current && !isReconnect) {
+      // Already connected, do nothing
+      return
+    }
+
+    if (!uri) {
+      console.error('No WebSocket URI configured')
+      return
+    }
+
+    // Clear any pending reconnection timer
+    if (wsReconnectTimer.current) {
+      clearTimeout(wsReconnectTimer.current)
+      wsReconnectTimer.current = null
+    }
+
+    // Reset intentional disconnect flag when manually connecting
+    if (!isReconnect) {
+      wsIntentionalDisconnect.current = false
+    }
+
+    try {
+      // Add sessionId as query parameter to WebSocket URI
+      const separator = uri.includes('?') ? '&' : '?'
+      const wsUriWithSession = `${uri}${separator}sessionId=${sessionId}`
+      
+      if (isReconnect) {
+        console.log(`🔄 Reconnecting to WebSocket (attempt ${wsReconnectAttempts.current + 1})...`)
+        setIsWsReconnecting(true)
+      } else {
+        console.log('🔌 Connecting to WebSocket with sessionId:', sessionId)
+        setIsWsReconnecting(false)
+      }
+      
+      const ws = new WebSocket(wsUriWithSession)
+      
+      ws.onopen = () => {
+        console.log('✅ WebSocket connected to:', wsUriWithSession)
+        setIsWsConnected(true)
+        setIsWsReconnecting(false)
+        // Reset reconnection attempts on successful connection
+        wsReconnectAttempts.current = 0
+        wsIntentionalDisconnect.current = false
+      }
+      
+      ws.onmessage = (event) => {
+        console.log('WebSocket message received:', event.data)
+        // Convert to string to ensure proper display
+        const messageText = typeof event.data === 'string' 
+          ? event.data 
+          : JSON.stringify(event.data)
+        setWsText(messageText)
+      }
+      
+      ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error)
+        setIsWsConnected(false)
+        // Keep reconnecting state if it's a reconnect attempt
+      }
+      
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected - Code:', event.code, 'Reason:', event.reason)
+        setIsWsConnected(false)
+        
+        // Only attempt reconnection if:
+        // 1. Disconnection was not intentional
+        // 2. We have a valid URI
+        // 3. Connection was previously established or this is a reconnect attempt
+        if (!wsIntentionalDisconnect.current && uri) {
+          wsReconnectAttempts.current++
+          setIsWsReconnecting(true)
+          
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
+          const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts.current - 1), 30000)
+          
+          console.log(`⏳ Reconnecting in ${delay / 1000}s... (attempt ${wsReconnectAttempts.current})`)
+          
+          wsReconnectTimer.current = setTimeout(() => {
+            handleWsConnect(uri, true)
+          }, delay)
+        } else if (wsIntentionalDisconnect.current) {
+          console.log('🛑 WebSocket closed intentionally - no reconnection')
+          setIsWsReconnecting(false)
+          setWsText('')
+        }
+      }
+      
+      wsRef.current = ws
+    } catch (error) {
+      console.error('Failed to create WebSocket connection:', error)
+      setIsWsConnected(false)
+      
+      // Attempt reconnection on connection failure
+      if (!wsIntentionalDisconnect.current && uri) {
+        wsReconnectAttempts.current++
+        setIsWsReconnecting(true)
+        const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts.current - 1), 30000)
+        
+        console.log(`⏳ Retrying connection in ${delay / 1000}s... (attempt ${wsReconnectAttempts.current})`)
+        
+        wsReconnectTimer.current = setTimeout(() => {
+          handleWsConnect(uri, true)
+        }, delay)
+      } else {
+        setIsWsReconnecting(false)
+      }
+    }
+  }
+
+  const handleWsDisconnect = () => {
+    // Mark as intentional disconnect to prevent auto-reconnection
+    wsIntentionalDisconnect.current = true
+    
+    // Clear any pending reconnection timer
+    if (wsReconnectTimer.current) {
+      clearTimeout(wsReconnectTimer.current)
+      wsReconnectTimer.current = null
+    }
+    
+    // Reset reconnection attempts
+    wsReconnectAttempts.current = 0
+    
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
+    }
+    setIsWsConnected(false)
+    setIsWsReconnecting(false)
+    setWsText('')
+    
+    console.log('🛑 WebSocket manually disconnected')
+  }
+
   const handleCloseErrorModal = () => {
     setIsErrorModalOpen(false)
     setError(null)
@@ -332,6 +524,9 @@ function App() {
             isDisabled={isLoading}
             brokerConfig={brokerConfig}
             conversationTitle={customization.title}
+            wsText={wsText}
+            isWsConnected={isWsConnected}
+            isWsReconnecting={isWsReconnecting}
           />
         ) : currentView === 'information' ? (
           <Information />
@@ -346,6 +541,12 @@ function App() {
             onSavePromptDecorator={handleSavePromptDecorator}
             customization={customization}
             onSaveCustomization={handleSaveCustomization}
+            wsConfig={wsConfig}
+            onSaveWsConfig={handleSaveWsConfig}
+            isWsConnected={isWsConnected}
+            isWsReconnecting={isWsReconnecting}
+            onWsConnect={handleWsConnect}
+            onWsDisconnect={handleWsDisconnect}
           />
         )}
       </div>

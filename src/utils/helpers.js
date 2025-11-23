@@ -26,9 +26,10 @@ export const generateRandomId = () => {
  * Crear la estructura JSON-RPC para enviar mensaje al broker
  * @param {string} text - Texto del mensaje
  * @param {string|null} conversationId - ID de conversación opcional
+ * @param {string|null} sessionId - ID de sesión de la aplicación
  * @returns {object} Estructura JSON-RPC
  */
-export const createBrokerMessage = (text, conversationId = null) => {
+export const createBrokerMessage = (text, conversationId = null, sessionId = null) => {
   const payload = {
     jsonrpc: "2.0",
     id: generateRandomId(),
@@ -52,6 +53,11 @@ export const createBrokerMessage = (text, conversationId = null) => {
   // Add conversation_id if provided
   if (conversationId) {
     payload.params.conversation_id = conversationId
+  }
+  
+  // Add sessionId to metadata if provided
+  if (sessionId) {
+    payload.params.metadata.sessionId = sessionId
   }
   
   return payload
