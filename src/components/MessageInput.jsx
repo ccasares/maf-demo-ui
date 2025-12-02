@@ -2,7 +2,7 @@ import { useState, useRef, useImperativeHandle, forwardRef } from 'react'
 import { IoSend } from 'react-icons/io5'
 import './MessageInput.css'
 
-const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig, wsText = '', isWsConnected = false, isWsReconnecting = false }, ref) => {
+const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig, isWsConnected = false, isWsReconnecting = false }, ref) => {
   const [text, setText] = useState('')
   const inputRef = useRef(null)
 
@@ -41,9 +41,9 @@ const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig
 
   return (
     <div className="message-input-container">
-      {(isBrokerConfigured || wsText) && (
+      {isBrokerConfigured && (
         <div className="status-indicators">
-          {isBrokerConfigured && brokerConfig.name && (
+          {brokerConfig.name && (
             <div className="broker-indicator">
               Current broker: <strong>{brokerConfig.name}</strong>
             </div>
@@ -73,19 +73,6 @@ const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig
           <IoSend />
         </button>
       </form>
-      
-      {/* WebSocket Messages Display */}
-      {wsText && (
-        <div className="websocket-section">
-          <input
-            type="text"
-            value={wsText}
-            readOnly
-            placeholder="WebSocket messages will appear here..."
-            className="ws-input-field"
-          />
-        </div>
-      )}
     </div>
   )
 })

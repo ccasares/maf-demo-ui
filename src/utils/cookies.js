@@ -14,7 +14,15 @@ export const getCookie = (name) => {
   for (let i = 0; i < ca.length; i++) {
     let c = ca[i];
     while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    if (c.indexOf(nameEQ) === 0) {
+      const value = c.substring(nameEQ.length, c.length);
+      try {
+        return decodeURIComponent(value);
+      } catch (e) {
+        console.error('Error decoding cookie value:', e);
+        return value; // Return raw value if decoding fails
+      }
+    }
   }
   
   return null;
@@ -35,7 +43,9 @@ export const setCookie = (name, value, days = 365) => {
     expires = "; expires=" + date.toUTCString();
   }
   
-  document.cookie = name + "=" + (value || "") + expires + "; path=/";
+  // Encode the value to handle special characters
+  const encodedValue = encodeURIComponent(value || "");
+  document.cookie = name + "=" + encodedValue + expires + "; path=/";
 }
 
 /**

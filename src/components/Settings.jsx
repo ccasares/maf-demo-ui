@@ -4,7 +4,7 @@ import { isValidURL } from '../utils/cookies'
 import { generateColorScheme } from '../utils/colorUtils'
 import './Settings.css'
 
-function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator, customization, onSaveCustomization, wsConfig, onSaveWsConfig, isWsConnected, isWsReconnecting, onWsConnect, onWsDisconnect }) {
+function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator, customization, onSaveCustomization, wsConfig, onSaveWsConfig, isWsConnected, isWsReconnecting, onWsConnect, onWsDisconnect, sessionId }) {
   const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerConfig?.url || '')
   const [name, setName] = useState(brokerConfig?.name || '')
@@ -26,8 +26,10 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   const [showDecoratorSuccess, setShowDecoratorSuccess] = useState(false)
 
   // WebSocket state
+  const [wsEnabled, setWsEnabled] = useState(wsConfig?.enabled || false)
   const [wsUri, setWsUri] = useState(wsConfig?.uri || '')
   const [wsConnectOnStart, setWsConnectOnStart] = useState(wsConfig?.connectOnStart || false)
+  const [wsEnableSessionIdDecorator, setWsEnableSessionIdDecorator] = useState(wsConfig?.enableSessionIdDecorator || false)
   const [wsUriValid, setWsUriValid] = useState(true)
   const [wsUriTouched, setWsUriTouched] = useState(false)
   const [showWsSuccess, setShowWsSuccess] = useState(false)
@@ -49,8 +51,10 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   }, [customization])
 
   useEffect(() => {
+    setWsEnabled(wsConfig?.enabled || false)
     setWsUri(wsConfig?.uri || '')
     setWsConnectOnStart(wsConfig?.connectOnStart || false)
+    setWsEnableSessionIdDecorator(wsConfig?.enableSessionIdDecorator || false)
   }, [wsConfig])
 
   const validateUrl = (value) => {
@@ -231,8 +235,19 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
     setWsUriValid(valid)
     
     if (valid) {
-      onSaveWsConfig({ uri: wsUri.trim(), connectOnStart: wsConnectOnStart })
+      const newConfig = { 
+        enabled: wsEnabled,
+        uri: wsUri.trim(), 
+        connectOnStart: wsConnectOnStart,
+        enableSessionIdDecorator: wsEnableSessionIdDecorator
+      }
+      onSaveWsConfig(newConfig)
       setShowWsSuccess(true)
+      
+      // If disabling WebSocket while connected, disconnect
+      if (!wsEnabled && isWsConnected) {
+        onWsDisconnect()
+      }
       
       // Hide success message after 3 seconds
       setTimeout(() => {
@@ -242,8 +257,10 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   }
 
   const canSaveWs = (
+    wsEnabled !== (wsConfig?.enabled || false) ||
     wsUri.trim() !== (wsConfig?.uri || '') ||
-    wsConnectOnStart !== (wsConfig?.connectOnStart || false)
+    wsConnectOnStart !== (wsConfig?.connectOnStart || false) ||
+    wsEnableSessionIdDecorator !== (wsConfig?.enableSessionIdDecorator || false)
   ) && wsUriValid
 
   return (
@@ -486,6 +503,48 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
       {/* WebSockets Tab */}
       {activeTab === 'websockets' && (
         <form className="settings-form" onSubmit={handleWsSubmit}>
+          {/* Enable/Disable WebSocket */}
+          <div className="form-group ws-enable-section">
+            <div className="checkbox-wrapper">
+              <input
+                id="ws-enabled"
+                type="checkbox"
+                checked={wsEnabled}
+                onChange={(e) => setWsEnabled(e.target.checked)}
+                className="form-checkbox"
+              />
+              <label htmlFor="ws-enabled" className="checkbox-label checkbox-label-primary">
+                Enable WebSocket Communication
+              </label>
+            </div>
+            
+            <p className="help-text">
+              Enable or disable WebSocket communication. When disabled, all other WebSocket settings will be read-only.
+            </p>
+          </div>
+
+          {/* Session ID Decorator (only visible when enabled) */}
+          {wsEnabled && (
+            <div className="form-group ws-decorator-section">
+              <div className="checkbox-wrapper">
+                <input
+                  id="ws-session-decorator"
+                  type="checkbox"
+                  checked={wsEnableSessionIdDecorator}
+                  onChange={(e) => setWsEnableSessionIdDecorator(e.target.checked)}
+                  className="form-checkbox"
+                />
+                <label htmlFor="ws-session-decorator" className="checkbox-label">
+                  Enable prompt decorator with Session Id ({sessionId})
+                </label>
+              </div>
+              
+              <p className="help-text">
+                When enabled, the session ID will be appended to the message text sent to the broker.
+              </p>
+            </div>
+          )}
+
           <div className="form-group">
             <label htmlFor="ws-uri" className="form-label">
               WebSocket Server URI
@@ -499,6 +558,7 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
               onBlur={handleWsUriBlur}
               placeholder="ws://localhost:8081/ws/in"
               className={`form-input ${!wsUriValid && wsUriTouched ? 'error' : ''} ${showWsSuccess ? 'success' : ''}`}
+              disabled={!wsEnabled}
             />
             
             {!wsUriValid && wsUriTouched && (
@@ -537,6 +597,7 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
                 checked={wsConnectOnStart}
                 onChange={(e) => setWsConnectOnStart(e.target.checked)}
                 className="form-checkbox"
+                disabled={!wsEnabled}
               />
               <label htmlFor="ws-connect-on-start" className="checkbox-label">
                 Connect on start
@@ -555,7 +616,7 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
                 type="button" 
                 className="connect-button"
                 onClick={() => onWsConnect()}
-                disabled={isWsConnected || !wsUri.trim() || !wsUriValid}
+                disabled={!wsEnabled || isWsConnected || !wsUri.trim() || !wsUriValid}
               >
                 Connect
               </button>
@@ -563,7 +624,7 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
                 type="button" 
                 className="disconnect-button"
                 onClick={onWsDisconnect}
-                disabled={!isWsConnected}
+                disabled={!wsEnabled || !isWsConnected}
               >
                 Disconnect
               </button>

@@ -28,11 +28,16 @@ function App() {
   const [brokerUrlHistory, setBrokerUrlHistory] = useState([])
   const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
   const [customization, setCustomization] = useState({ logo: null, title: 'Conversation', colorScheme: null })
-  const [wsConfig, setWsConfig] = useState({ uri: '', connectOnStart: false })
+  const [wsConfig, setWsConfig] = useState({ 
+    enabled: false, 
+    uri: '', 
+    connectOnStart: false, 
+    enableSessionIdDecorator: false 
+  })
   const [isWsConnected, setIsWsConnected] = useState(false)
   const [isWsReconnecting, setIsWsReconnecting] = useState(false)
-  const [wsText, setWsText] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingText, setLoadingText] = useState('Waiting for response...')
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
   const [conversationContextId, setConversationContextId] = useState(null)
@@ -41,6 +46,7 @@ function App() {
   const wsReconnectAttempts = useRef(0)
   const wsReconnectTimer = useRef(null)
   const wsIntentionalDisconnect = useRef(false)
+  const isLoadingRef = useRef(false)
 
   // Cargar la URL del broker desde la cookie al iniciar la aplicación
   useEffect(() => {
@@ -92,6 +98,15 @@ function App() {
         setCustomization(parsed)
       } catch (e) {
         console.error('Error parsing customization cookie:', e)
+        console.warn('Clearing corrupted customization cookie')
+        // Clear the corrupted cookie
+        deleteCookie(CUSTOMIZATION_COOKIE_NAME)
+        // Reset to default customization
+        setCustomization({
+          logo: null,
+          title: 'Conversation',
+          colorScheme: null
+        })
       }
     }
   }, [])
@@ -102,14 +117,21 @@ function App() {
     if (savedWsConfig) {
       try {
         const parsed = JSON.parse(savedWsConfig)
-        setWsConfig(parsed)
+        // Ensure all properties exist with defaults
+        const config = {
+          enabled: parsed.enabled || false,
+          uri: parsed.uri || '',
+          connectOnStart: parsed.connectOnStart || false,
+          enableSessionIdDecorator: parsed.enableSessionIdDecorator || false
+        }
+        setWsConfig(config)
         
-        // Auto-connect if connectOnStart is enabled
-        if (parsed.connectOnStart && parsed.uri) {
+        // Auto-connect if enabled, connectOnStart is enabled, and URI is set
+        if (config.enabled && config.connectOnStart && config.uri) {
           // Delay connection to ensure everything is loaded
           setTimeout(() => {
             wsIntentionalDisconnect.current = false
-            handleWsConnect(parsed.uri)
+            handleWsConnect(config.uri, false, config)
           }, 500)
         }
       } catch (e) {
@@ -163,6 +185,11 @@ function App() {
       messageText = `${text}. ${promptDecorator.text.trim()}`
     }
 
+    // Apply session ID decorator if enabled
+    if (wsConfig.enabled && wsConfig.enableSessionIdDecorator) {
+      messageText = `${messageText}. sessionId=${sessionId}`
+    }
+
     // Create JSON-RPC payload with decorated text, conversation context, and session ID
     const payload = createBrokerMessage(messageText, conversationContextId, sessionId)
 
@@ -183,6 +210,8 @@ function App() {
 
     // Start loading
     setIsLoading(true)
+    isLoadingRef.current = true
+    setLoadingText('Waiting for response...')
 
     try {
       // Make POST request to broker
@@ -305,6 +334,7 @@ function App() {
       
     } finally {
       setIsLoading(false)
+      isLoadingRef.current = false
       
       // Focus input after receiving response (success or error)
       setTimeout(() => {
@@ -354,8 +384,30 @@ function App() {
   }
 
   const handleSaveCustomization = (customizationData) => {
-    setCustomization(customizationData)
-    setCookie(CUSTOMIZATION_COOKIE_NAME, JSON.stringify(customizationData), 365)
+    try {
+      const jsonString = JSON.stringify(customizationData)
+      
+      // Check cookie size (browsers typically limit cookies to 4KB)
+      // Note: cookies can actually store more than 4KB in modern browsers, but let's warn if it's very large
+      const sizeInKB = new Blob([jsonString]).size / 1024
+      
+      if (sizeInKB > 100) {
+        console.warn(`Customization data is large (${sizeInKB.toFixed(2)} KB). Consider using a smaller image.`)
+      }
+      
+      setCustomization(customizationData)
+      setCookie(CUSTOMIZATION_COOKIE_NAME, jsonString, 365)
+      
+      console.log(`✅ Customization saved successfully (${sizeInKB.toFixed(2)} KB)`)
+    } catch (e) {
+      console.error('Error saving customization:', e)
+      setError({
+        type: 'CUSTOMIZATION_SAVE_ERROR',
+        message: 'Failed to save customization settings',
+        details: e.message
+      })
+      setIsErrorModalOpen(true)
+    }
   }
 
   const handleSaveWsConfig = (config) => {
@@ -363,9 +415,19 @@ function App() {
     setCookie(WEBSOCKET_CONFIG_COOKIE_NAME, JSON.stringify(config), 365)
   }
 
-  const handleWsConnect = (uri = wsConfig.uri, isReconnect = false) => {
+  const handleWsConnect = (uri = wsConfig.uri, isReconnect = false, configOverride = null) => {
     if (isWsConnected && wsRef.current && !isReconnect) {
       // Already connected, do nothing
+      return
+    }
+
+    // Use configOverride if provided (for auto-connect on start), otherwise use wsConfig state
+    const activeConfig = configOverride || wsConfig
+    
+    // Only check if enabled when NOT reconnecting
+    // (if we're reconnecting, it means it was enabled before)
+    if (!isReconnect && !activeConfig.enabled) {
+      console.warn('WebSocket is disabled in configuration')
       return
     }
 
@@ -415,7 +477,16 @@ function App() {
         const messageText = typeof event.data === 'string' 
           ? event.data 
           : JSON.stringify(event.data)
-        setWsText(messageText)
+        
+        // If we're waiting for a response, update the loading text with the WebSocket message
+        if (isLoadingRef.current) {
+          console.log('✅ Updating loading text with WebSocket message:', messageText)
+          // Update the loading indicator text instead of adding a new message
+          setLoadingText(messageText)
+        } else {
+          // If not loading, just log it (or could show a notification)
+          console.log('ℹ️ WebSocket message received but not waiting for response:', messageText)
+        }
       }
       
       ws.onerror = (error) => {
@@ -447,7 +518,6 @@ function App() {
         } else if (wsIntentionalDisconnect.current) {
           console.log('🛑 WebSocket closed intentionally - no reconnection')
           setIsWsReconnecting(false)
-          setWsText('')
         }
       }
       
@@ -492,7 +562,6 @@ function App() {
     }
     setIsWsConnected(false)
     setIsWsReconnecting(false)
-    setWsText('')
     
     console.log('🛑 WebSocket manually disconnected')
   }
@@ -524,7 +593,7 @@ function App() {
             isDisabled={isLoading}
             brokerConfig={brokerConfig}
             conversationTitle={customization.title}
-            wsText={wsText}
+            loadingText={loadingText}
             isWsConnected={isWsConnected}
             isWsReconnecting={isWsReconnecting}
           />
@@ -547,6 +616,7 @@ function App() {
             isWsReconnecting={isWsReconnecting}
             onWsConnect={handleWsConnect}
             onWsDisconnect={handleWsDisconnect}
+            sessionId={sessionId}
           />
         )}
       </div>
