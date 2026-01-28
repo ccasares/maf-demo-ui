@@ -14,6 +14,7 @@ const BROKER_URL_HISTORY_COOKIE_NAME = 'mulesoft_broker_url_history'
 const PROMPT_DECORATOR_COOKIE_NAME = 'mulesoft_prompt_decorator'
 const CUSTOMIZATION_COOKIE_NAME = 'mulesoft_customization'
 const WEBSOCKET_CONFIG_COOKIE_NAME = 'mulesoft_websocket_config'
+const SECURITY_CONFIG_COOKIE_NAME = 'mulesoft_security_config'
 
 function App() {
   // Generate session ID once on app initialization (persists only in memory)
@@ -28,6 +29,13 @@ function App() {
   const [brokerUrlHistory, setBrokerUrlHistory] = useState([])
   const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
   const [customization, setCustomization] = useState({ logo: null, title: 'Conversation', colorScheme: null })
+  const [securityConfig, setSecurityConfig] = useState({
+    enabled: false,
+    headers: [
+      { name: 'client_id', value: '' },
+      { name: 'client_secret', value: '' }
+    ]
+  })
   const [wsConfig, setWsConfig] = useState({ 
     enabled: false, 
     uri: '', 
@@ -111,6 +119,31 @@ function App() {
     }
   }, [])
 
+  // Load security config from cookie on app start
+  useEffect(() => {
+    const savedSecurity = getCookie(SECURITY_CONFIG_COOKIE_NAME)
+    if (savedSecurity) {
+      try {
+        const parsed = JSON.parse(savedSecurity)
+        const headers = Array.isArray(parsed.headers) && parsed.headers.length
+          ? parsed.headers.map((header, index) => ({
+            name: header?.name || (index === 0 ? 'client_id' : 'client_secret'),
+            value: header?.value || ''
+          }))
+          : [
+            { name: 'client_id', value: '' },
+            { name: 'client_secret', value: '' }
+          ]
+        setSecurityConfig({
+          enabled: !!parsed.enabled,
+          headers
+        })
+      } catch (e) {
+        console.error('Error parsing security config cookie:', e)
+      }
+    }
+  }, [])
+
   // Load WebSocket config from cookie on app start
   useEffect(() => {
     const savedWsConfig = getCookie(WEBSOCKET_CONFIG_COOKIE_NAME)
@@ -168,6 +201,24 @@ function App() {
     }
   }, [customization.colorScheme])
 
+  const buildRequestHeaders = (includeContentType = true) => {
+    const headers = {}
+
+    if (includeContentType) {
+      headers['Content-Type'] = 'application/json'
+    }
+
+    if (securityConfig.enabled) {
+      securityConfig.headers.forEach((header) => {
+        if (header.name && header.value) {
+          headers[header.name] = header.value
+        }
+      })
+    }
+
+    return headers
+  }
+
   const handleSendMessage = async (text) => {
     // Check if broker URL is configured
     if (!brokerConfig.url) {
@@ -177,6 +228,21 @@ function App() {
       })
       setIsErrorModalOpen(true)
       return
+    }
+
+    // If security is enabled, validate header values
+    if (securityConfig.enabled) {
+      const hasEmptyHeader = securityConfig.headers.some(
+        (header) => !header.name?.trim() || !header.value?.trim()
+      )
+      if (hasEmptyHeader) {
+        setError({
+          message: 'Security headers are required',
+          details: 'Please fill in all security header values in Settings before sending messages.'
+        })
+        setIsErrorModalOpen(true)
+        return
+      }
     }
 
     // Apply prompt decorator if enabled
@@ -213,25 +279,41 @@ function App() {
     isLoadingRef.current = true
     setLoadingText('Waiting for response...')
 
+    const buildHttpError = (response, errorData, methodLabel) => {
+      if (response.status === 401) {
+        const errorMessage = errorData?.error || 'Authorization failed'
+        return {
+          status: response.status,
+          statusText: response.statusText,
+          message: `Authorization rejected (${methodLabel}): ${errorMessage}`,
+          responseData: errorData,
+          isAuthError: true
+        }
+      }
+
+      return {
+        status: response.status,
+        statusText: response.statusText,
+        message: `Server error (${methodLabel}): ${response.status} ${response.statusText}`,
+        responseData: errorData
+      }
+    }
+
     try {
+      // Build headers for POST
+      const requestHeaders = buildRequestHeaders()
+
       // Make POST request to broker
       const response = await fetch(brokerConfig.url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: requestHeaders,
         body: JSON.stringify(payload)
       })
 
       // Check if response is 200 OK
       if (!response.ok) {
         const errorData = await response.json().catch(() => null)
-        throw {
-          status: response.status,
-          statusText: response.statusText,
-          message: `Server error: ${response.status} ${response.statusText}`,
-          responseData: errorData
-        }
+        throw buildHttpError(response, errorData, 'POST')
       }
 
       // Process response
@@ -319,8 +401,8 @@ function App() {
       
       // Prepare error to show in modal
       const errorToShow = isCorsError ? {
-        message: 'Unable to invoke the Broker URL due to a CORS error. Please fix it and try again.',
-        details: 'Tip: Add the CORS APIM policy to the Broker inbound endpoint',
+        message: 'Unable to invoke the Broker URL due to a CORS/preflight error.',
+        details: 'Tip: Allow the required headers (client_id, client_secret, content-type) in Access-Control-Allow-Headers and enable CORS on the Broker endpoint.',
         isCorsError: true
       } : {
         message: err.message || 'Error communicating with broker',
@@ -413,6 +495,11 @@ function App() {
   const handleSaveWsConfig = (config) => {
     setWsConfig(config)
     setCookie(WEBSOCKET_CONFIG_COOKIE_NAME, JSON.stringify(config), 365)
+  }
+
+  const handleSaveSecurityConfig = (config) => {
+    setSecurityConfig(config)
+    setCookie(SECURITY_CONFIG_COOKIE_NAME, JSON.stringify(config), 365)
   }
 
   const handleWsConnect = (uri = wsConfig.uri, isReconnect = false, configOverride = null) => {
@@ -608,6 +695,8 @@ function App() {
             onDeleteUrlFromHistory={handleDeleteUrlFromHistory}
             promptDecorator={promptDecorator}
             onSavePromptDecorator={handleSavePromptDecorator}
+            securityConfig={securityConfig}
+            onSaveSecurityConfig={handleSaveSecurityConfig}
             customization={customization}
             onSaveCustomization={handleSaveCustomization}
             wsConfig={wsConfig}

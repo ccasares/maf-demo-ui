@@ -709,6 +709,26 @@
   word-break: break-all;
 }
 
+/* Security Tab */
+.security-headers {
+  margin-top: 1rem;
+}
+
+.security-headers.disabled {
+  opacity: 0.6;
+}
+
+.security-header-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+}
+
+.security-header-row .input-wrapper {
+  flex: 1;
+}
+
 /* Customize Tab Styles */
 .logo-upload-container {
   margin-top: 0.5rem;

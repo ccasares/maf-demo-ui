@@ -4,7 +4,7 @@ import { isValidURL } from '../utils/cookies'
 import { generateColorScheme } from '../utils/colorUtils'
 import './Settings.css'
 
-function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator, customization, onSaveCustomization, wsConfig, onSaveWsConfig, isWsConnected, isWsReconnecting, onWsConnect, onWsDisconnect, sessionId }) {
+function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrokerUrlHistory, onDeleteUrlFromHistory, promptDecorator, onSavePromptDecorator, customization, onSaveCustomization, wsConfig, onSaveWsConfig, isWsConnected, isWsReconnecting, onWsConnect, onWsDisconnect, sessionId, securityConfig, onSaveSecurityConfig }) {
   const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerConfig?.url || '')
   const [name, setName] = useState(brokerConfig?.name || '')
@@ -17,6 +17,19 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   const [decoratorEnabled, setDecoratorEnabled] = useState(promptDecorator?.enabled || false)
   const [decoratorText, setDecoratorText] = useState(promptDecorator?.text || '')
   
+  // Security state
+  const [securityEnabled, setSecurityEnabled] = useState(securityConfig?.enabled || false)
+  const [securityHeaders, setSecurityHeaders] = useState(
+    securityConfig?.headers?.length
+      ? securityConfig.headers
+      : [
+        { name: 'client_id', value: '' },
+        { name: 'client_secret', value: '' }
+      ]
+  )
+  const [showSecuritySuccess, setShowSecuritySuccess] = useState(false)
+  const [securityTouched, setSecurityTouched] = useState(false)
+
   // Customization state
   const [customLogo, setCustomLogo] = useState(customization?.logo || null)
   const [customTitle, setCustomTitle] = useState(customization?.title || 'Conversation')
@@ -43,6 +56,18 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
     setDecoratorEnabled(promptDecorator?.enabled || false)
     setDecoratorText(promptDecorator?.text || '')
   }, [promptDecorator])
+
+  useEffect(() => {
+    setSecurityEnabled(securityConfig?.enabled || false)
+    setSecurityHeaders(
+      securityConfig?.headers?.length
+        ? securityConfig.headers
+        : [
+          { name: 'client_id', value: '' },
+          { name: 'client_secret', value: '' }
+        ]
+    )
+  }, [securityConfig])
 
   useEffect(() => {
     setCustomLogo(customization?.logo || null)
@@ -152,6 +177,45 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   }
 
   const hasDecoratorConfig = decoratorEnabled || decoratorText.trim()
+
+  const handleSecurityHeaderChange = (index, field, value) => {
+    setSecurityHeaders((prev) => prev.map((header, i) => (
+      i === index ? { ...header, [field]: value } : header
+    )))
+    setShowSecuritySuccess(false)
+  }
+
+  const handleSecuritySubmit = (e) => {
+    e.preventDefault()
+    setSecurityTouched(true)
+
+    const cleanedHeaders = securityHeaders.map((header, index) => ({
+      name: header.name?.trim() || (index === 0 ? 'client_id' : 'client_secret'),
+      value: header.value?.trim() || ''
+    }))
+
+    const hasEmptyValues = cleanedHeaders.some((header) => !header.value)
+    if (securityEnabled && hasEmptyValues) {
+      return
+    }
+
+    const securityData = {
+      enabled: securityEnabled,
+      headers: cleanedHeaders
+    }
+
+    onSaveSecurityConfig(securityData)
+    setShowSecuritySuccess(true)
+
+    setTimeout(() => {
+      setShowSecuritySuccess(false)
+    }, 3000)
+  }
+
+  const canSaveSecurity = (
+    securityEnabled !== (securityConfig?.enabled || false) ||
+    JSON.stringify(securityHeaders) !== JSON.stringify(securityConfig?.headers || [])
+  ) && (!securityEnabled || !securityHeaders.some((header) => !header.value?.trim()))
 
   // Handle logo file upload
   const handleLogoUpload = (e) => {
@@ -277,6 +341,12 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
           onClick={() => setActiveTab('broker')}
         >
           Broker URL
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'security' ? 'active' : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          Security
         </button>
         <button
           className={`tab-button ${activeTab === 'decorator' ? 'active' : ''}`}
@@ -497,6 +567,81 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
               Clear
             </button>
           </div>
+        </form>
+      )}
+
+      {/* Security Tab */}
+      {activeTab === 'security' && (
+        <form className="settings-form" onSubmit={handleSecuritySubmit}>
+          <div className="form-group">
+            <div className="checkbox-wrapper">
+              <input
+                id="security-enabled"
+                type="checkbox"
+                checked={securityEnabled}
+                onChange={(e) => setSecurityEnabled(e.target.checked)}
+                className="form-checkbox"
+              />
+              <label htmlFor="security-enabled" className="checkbox-label">
+                Enable Security
+              </label>
+            </div>
+
+            <p className="help-text">
+              When enabled, the configured headers will be sent with every POST request.
+            </p>
+          </div>
+
+          <div className={`form-group security-headers ${!securityEnabled ? 'disabled' : ''}`}>
+            <label className="form-label">Headers</label>
+            {securityHeaders.map((header, index) => (
+              <div key={index} className="security-header-row">
+                <div className="input-wrapper">
+                  <label className="inline-label">Header Name</label>
+                  <input
+                    type="text"
+                    value={header.name}
+                    onChange={(e) => handleSecurityHeaderChange(index, 'name', e.target.value)}
+                    className="form-input"
+                    disabled={!securityEnabled}
+                  />
+                </div>
+                <div className="input-wrapper">
+                  <label className="inline-label">Header Value</label>
+                  <input
+                    type="text"
+                    value={header.value}
+                    onChange={(e) => handleSecurityHeaderChange(index, 'value', e.target.value)}
+                    onBlur={() => setSecurityTouched(true)}
+                    className={`form-input ${
+                      securityEnabled && securityTouched && !header.value.trim() ? 'error' : ''
+                    }`}
+                    disabled={!securityEnabled}
+                  />
+                </div>
+              </div>
+            ))}
+
+            {securityEnabled && securityTouched && securityHeaders.some((header) => !header.value.trim()) && (
+              <p className="error-message">
+                All header values are required when security is enabled.
+              </p>
+            )}
+
+            {showSecuritySuccess && (
+              <p className="success-message">
+                Security configuration saved successfully
+              </p>
+            )}
+          </div>
+
+          <button 
+            type="submit" 
+            className="save-button"
+            disabled={!canSaveSecurity}
+          >
+            Save
+          </button>
         </form>
       )}
 
@@ -844,6 +989,26 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
             <div className="config-item">
               <span className="config-label">Decorator Text:</span>
               <span className="config-value">{promptDecorator.text}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'security' && securityConfig && (
+        <div className="current-config">
+          <h3>Current Configuration</h3>
+          <div className="config-item">
+            <span className="config-label">Status:</span>
+            <span className="config-value">{securityConfig.enabled ? 'Enabled' : 'Disabled'}</span>
+          </div>
+          {securityConfig.enabled && (
+            <div className="config-item">
+              <span className="config-label">Headers:</span>
+              <div className="config-value">
+                {securityConfig.headers.map((header, index) => (
+                  <div key={index}>{header.name}: {header.value ? '••••••' : ''}</div>
+                ))}
+              </div>
             </div>
           )}
         </div>
