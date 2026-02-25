@@ -27,9 +27,10 @@ export const generateRandomId = () => {
  * @param {string} text - Texto del mensaje
  * @param {string|null} conversationId - ID de conversación opcional
  * @param {string|null} sessionId - ID de sesión de la aplicación
+ * @param {string|null} taskId - ID de tarea opcional
  * @returns {object} Estructura JSON-RPC
  */
-export const createBrokerMessage = (text, conversationId = null, sessionId = null) => {
+export const createBrokerMessage = (text, conversationId = null, sessionId = null, taskId = null) => {
   const payload = {
     jsonrpc: "2.0",
     id: generateRandomId(),
@@ -50,9 +51,14 @@ export const createBrokerMessage = (text, conversationId = null, sessionId = nul
     }
   }
   
-  // Add conversation_id if provided
+  // Add contextId to message if provided
   if (conversationId) {
-    payload.params.conversation_id = conversationId
+    payload.params.message.contextId = conversationId
+  }
+  
+  // Add taskId to message if provided
+  if (taskId) {
+    payload.params.message.taskId = taskId
   }
   
   // Add sessionId to metadata if provided

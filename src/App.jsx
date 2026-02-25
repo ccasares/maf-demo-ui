@@ -49,6 +49,7 @@ function App() {
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
   const [conversationContextId, setConversationContextId] = useState(null)
+  const [conversationTaskId, setConversationTaskId] = useState(null)
   const conversationViewRef = useRef(null)
   const wsRef = useRef(null)
   const wsReconnectAttempts = useRef(0)
@@ -256,8 +257,12 @@ function App() {
       messageText = `${messageText}. sessionId=${sessionId}`
     }
 
-    // Create JSON-RPC payload with decorated text, conversation context, and session ID
-    const payload = createBrokerMessage(messageText, conversationContextId, sessionId)
+    // Create JSON-RPC payload with decorated text, conversation context, session ID, and task ID
+    console.log("About to create broker message:")
+    console.log("conversationContextId: ", conversationContextId)
+    console.log("sessionId: ", sessionId)
+    console.log("conversationTaskId: ", conversationTaskId)
+    const payload = createBrokerMessage(messageText, conversationContextId, sessionId, conversationTaskId)
 
     // Add user message to canvas (right side) - showing original text without decorator
     const userMessage = {
@@ -324,14 +329,20 @@ function App() {
       
       // Check conversation state
       const conversationState = responseData?.result?.status?.state
-      
+
       // Handle conversation context based on state
-      if (conversationState === 'input-required' && responseData?.result?.contextId) {
-        // Save contextId for next message
-        setConversationContextId(responseData.result.contextId)
+      if (conversationState === 'input-required' || conversationState === 'input_required') {
+        // Save contextId and taskId for next message
+        if (responseData?.result?.contextId) {
+          setConversationContextId(responseData.result.contextId)
+        }
+        if (responseData?.result?.status?.message?.taskId) {
+          setConversationTaskId(responseData?.result?.status?.message?.taskId)
+        }
       } else if (conversationState === 'completed') {
-        // Clear contextId for next message
+        // Clear contextId and taskId for next message
         setConversationContextId(null)
+        setConversationTaskId(null)
       }
       
       // Check if response is empty
