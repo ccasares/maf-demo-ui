@@ -4,8 +4,9 @@ import ConversationView from './components/ConversationView'
 import Settings from './components/Settings'
 import Information from './components/Information'
 import ErrorModal from './components/ErrorModal'
+import AnnouncementModal from './components/AnnouncementModal'
 import { getCookie, setCookie, deleteCookie } from './utils/cookies'
-import { createBrokerMessage, extractBrokerResponseText, generateUUID } from './utils/helpers'
+import { createBrokerMessage, extractBrokerResponseText, extractConversationState, extractContextId, extractTaskId, generateUUID } from './utils/helpers'
 import { generateColorScheme, applyColorScheme, resetColorScheme } from './utils/colorUtils'
 import './App.css'
 
@@ -15,6 +16,7 @@ const PROMPT_DECORATOR_COOKIE_NAME = 'mulesoft_prompt_decorator'
 const CUSTOMIZATION_COOKIE_NAME = 'mulesoft_customization'
 const WEBSOCKET_CONFIG_COOKIE_NAME = 'mulesoft_websocket_config'
 const SECURITY_CONFIG_COOKIE_NAME = 'mulesoft_security_config'
+const ANNOUNCEMENT_SEEN_COOKIE_NAME = 'mulesoft_announcement_v2_seen'
 
 function App() {
   // Generate session ID once on app initialization (persists only in memory)
@@ -25,7 +27,7 @@ function App() {
   })
   const [currentView, setCurrentView] = useState('conversations')
   const [messages, setMessages] = useState([])
-  const [brokerConfig, setBrokerConfig] = useState({ url: '', name: '' })
+  const [brokerConfig, setBrokerConfig] = useState({ url: '', name: '', version: 'V1' })
   const [brokerUrlHistory, setBrokerUrlHistory] = useState([])
   const [promptDecorator, setPromptDecorator] = useState({ enabled: false, text: '' })
   const [customization, setCustomization] = useState({ logo: null, title: 'Conversation', colorScheme: null })
@@ -48,6 +50,7 @@ function App() {
   const [loadingText, setLoadingText] = useState('Waiting for response...')
   const [error, setError] = useState(null)
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false)
   const [conversationContextId, setConversationContextId] = useState(null)
   const [conversationTaskId, setConversationTaskId] = useState(null)
   const conversationViewRef = useRef(null)
@@ -65,11 +68,15 @@ function App() {
         // Try to parse as JSON object (new format)
         const parsed = JSON.parse(savedBroker)
         if (parsed.url) {
-          setBrokerConfig(parsed)
+          // Ensure version has default value "V1" if not present
+          setBrokerConfig({
+            ...parsed,
+            version: parsed.version || 'V1'
+          })
         }
       } catch (e) {
         // Fallback to old string format
-        setBrokerConfig({ url: savedBroker, name: '' })
+        setBrokerConfig({ url: savedBroker, name: '', version: 'V1' })
       }
     }
 
@@ -78,7 +85,12 @@ function App() {
     if (savedHistory) {
       try {
         const parsed = JSON.parse(savedHistory)
-        setBrokerUrlHistory(parsed)
+        // Ensure each history item has version with default "V1"
+        const historyWithVersion = parsed.map(item => ({
+          ...item,
+          version: item.version || 'V1'
+        }))
+        setBrokerUrlHistory(historyWithVersion)
       } catch (e) {
         console.error('Error parsing broker URL history cookie:', e)
       }
@@ -202,11 +214,27 @@ function App() {
     }
   }, [customization.colorScheme])
 
-  const buildRequestHeaders = (includeContentType = true) => {
+  // Check if announcement should be shown
+  useEffect(() => {
+    const announcementSeen = getCookie(ANNOUNCEMENT_SEEN_COOKIE_NAME)
+    if (!announcementSeen) {
+      // Show announcement modal after a short delay
+      setTimeout(() => {
+        setIsAnnouncementModalOpen(true)
+      }, 500)
+    }
+  }, [])
+
+  const buildRequestHeaders = (includeContentType = true, brokerVersion = 'V1') => {
     const headers = {}
 
     if (includeContentType) {
       headers['Content-Type'] = 'application/json'
+    }
+
+    // Add a2a-version header for V2
+    if (brokerVersion === 'V2') {
+      headers['a2a-version'] = '1.0'
     }
 
     if (securityConfig.enabled) {
@@ -257,12 +285,8 @@ function App() {
       messageText = `${messageText}. sessionId=${sessionId}`
     }
 
-    // Create JSON-RPC payload with decorated text, conversation context, session ID, and task ID
-    console.log("About to create broker message:")
-    console.log("conversationContextId: ", conversationContextId)
-    console.log("sessionId: ", sessionId)
-    console.log("conversationTaskId: ", conversationTaskId)
-    const payload = createBrokerMessage(messageText, conversationContextId, sessionId, conversationTaskId)
+    // Create JSON-RPC payload with decorated text, conversation context, session ID, task ID, and broker version
+    const payload = createBrokerMessage(messageText, conversationContextId, sessionId, conversationTaskId, brokerConfig.version || 'V1')
 
     // Add user message to canvas (right side) - showing original text without decorator
     const userMessage = {
@@ -305,8 +329,8 @@ function App() {
     }
 
     try {
-      // Build headers for POST
-      const requestHeaders = buildRequestHeaders()
+      // Build headers for POST with broker version
+      const requestHeaders = buildRequestHeaders(true, brokerConfig.version || 'V1')
 
       // Make POST request to broker
       const response = await fetch(brokerConfig.url, {
@@ -327,17 +351,20 @@ function App() {
       // Extract text from response
       const responseText = extractBrokerResponseText(responseData)
       
-      // Check conversation state
-      const conversationState = responseData?.result?.status?.state
-
+      // Extract conversation state using helper (handles both V1 and V2)
+      const conversationState = extractConversationState(responseData)
+      
       // Handle conversation context based on state
       if (conversationState === 'input-required' || conversationState === 'input_required') {
-        // Save contextId and taskId for next message
-        if (responseData?.result?.contextId) {
-          setConversationContextId(responseData.result.contextId)
+        // Extract contextId and taskId using helpers (handles both V1 and V2)
+        const contextId = extractContextId(responseData)
+        const taskId = extractTaskId(responseData)
+        
+        if (contextId) {
+          setConversationContextId(contextId)
         }
-        if (responseData?.result?.status?.message?.taskId) {
-          setConversationTaskId(responseData?.result?.status?.message?.taskId)
+        if (taskId) {
+          setConversationTaskId(taskId)
         }
       } else if (conversationState === 'completed') {
         // Clear contextId and taskId for next message
@@ -669,6 +696,14 @@ function App() {
     setError(null)
   }
 
+  const handleCloseAnnouncementModal = () => {
+    setIsAnnouncementModalOpen(false)
+  }
+
+  const handleDontShowAnnouncementAgain = () => {
+    setCookie(ANNOUNCEMENT_SEEN_COOKIE_NAME, 'true', 365) // Save for 1 year
+  }
+
   const handleClearMessages = () => {
     setMessages([])
   }
@@ -724,6 +759,11 @@ function App() {
         isOpen={isErrorModalOpen}
         onClose={handleCloseErrorModal}
         error={error}
+      />
+      <AnnouncementModal
+        isOpen={isAnnouncementModalOpen}
+        onClose={handleCloseAnnouncementModal}
+        onDontShowAgain={handleDontShowAnnouncementAgain}
       />
     </div>
   )

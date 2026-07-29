@@ -26,6 +26,12 @@
   font-weight: 600;
 }
 
+.broker-version {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.7rem;
+}
+
 .ws-status-indicator {
   display: flex;
   align-items: center;

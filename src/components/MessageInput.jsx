@@ -45,7 +45,7 @@ const MessageInput = forwardRef(({ onSendMessage, disabled = false, brokerConfig
         <div className="status-indicators">
           {brokerConfig.name && (
             <div className="broker-indicator">
-              Current broker: <strong>{brokerConfig.name}</strong>
+              Current broker: <strong>{brokerConfig.name}</strong> <span className="broker-version">({brokerConfig.version || 'V1'})</span>
             </div>
           )}
           <div className="ws-status-indicator">

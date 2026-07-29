@@ -8,6 +8,7 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   const [activeTab, setActiveTab] = useState('broker')
   const [url, setUrl] = useState(brokerConfig?.url || '')
   const [name, setName] = useState(brokerConfig?.name || '')
+  const [version, setVersion] = useState(brokerConfig?.version || 'V1')
   const [isValid, setIsValid] = useState(true)
   const [showSuccess, setShowSuccess] = useState(false)
   const [touched, setTouched] = useState(false)
@@ -50,6 +51,7 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
   useEffect(() => {
     setUrl(brokerConfig?.url || '')
     setName(brokerConfig?.name || '')
+    setVersion(brokerConfig?.version || 'V1')
   }, [brokerConfig])
 
   useEffect(() => {
@@ -112,7 +114,7 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
     setIsValid(valid)
     
     if (valid && url.trim()) {
-      onSaveBrokerUrl({ url: url.trim(), name: name.trim() })
+      onSaveBrokerUrl({ url: url.trim(), name: name.trim(), version: version || 'V1' })
       setShowSuccess(true)
       
       // Hide success message after 3 seconds
@@ -122,11 +124,12 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
     }
   }
 
-  const canSave = url.trim() && isValid && (url !== brokerConfig?.url || name !== brokerConfig?.name)
+  const canSave = url.trim() && isValid && (url !== brokerConfig?.url || name !== brokerConfig?.name || version !== brokerConfig?.version)
 
   const handleSelectFromHistory = (historyItem) => {
     setUrl(historyItem.url)
     setName(historyItem.name || '')
+    setVersion(historyItem.version || 'V1')
     setShowHistory(false)
     setIsValid(true)
     setTouched(true)
@@ -416,10 +419,13 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
                     type="button"
                     className="history-item-button"
                     onClick={() => handleSelectFromHistory(historyItem)}
-                    title={`${historyItem.name || 'Unnamed'}: ${historyItem.url}`}
+                    title={`${historyItem.name || 'Unnamed'} (${historyItem.version || 'V1'}): ${historyItem.url}`}
                   >
                     <div className="history-item-content">
-                      {historyItem.name && <span className="history-name">{historyItem.name}</span>}
+                      <div className="history-name-row">
+                        {historyItem.name && <span className="history-name">{historyItem.name}</span>}
+                        <span className="history-version">{historyItem.version || 'V1'}</span>
+                      </div>
                       <span className="history-url">{historyItem.url}</span>
                     </div>
                     {historyItem.url === brokerConfig?.url && (
@@ -450,6 +456,18 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
                 placeholder="Broker name"
                 className="form-input"
               />
+            </div>
+            <div className="input-wrapper">
+              <label htmlFor="broker-version" className="inline-label">Version</label>
+              <select
+                id="broker-version"
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                className="form-input"
+              >
+                <option value="V1">V1</option>
+                <option value="V2">V2</option>
+              </select>
             </div>
             <div className="input-wrapper">
               <label htmlFor="broker-url" className="inline-label">URL</label>
@@ -970,6 +988,10 @@ function Settings({ brokerConfig, brokerUrlHistory, onSaveBrokerUrl, onClearBrok
                 <span className="config-value">{brokerConfig.name}</span>
               </div>
             )}
+            <div className="config-item config-item-version">
+              <span className="config-label">Broker Version:</span>
+              <span className="config-value">{brokerConfig.version || 'V1'}</span>
+            </div>
             <div className="config-item config-item-url">
               <span className="config-label">Broker URL:</span>
               <span className="config-value">{brokerConfig.url}</span>
