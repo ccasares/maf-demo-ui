@@ -280,8 +280,8 @@ function App() {
       messageText = `${text}. ${promptDecorator.text.trim()}`
     }
 
-    // Apply session ID decorator if enabled
-    if (wsConfig.enabled && wsConfig.enableSessionIdDecorator) {
+    // Apply session ID decorator if enabled (V1 only)
+    if (wsConfig.enabled && wsConfig.enableSessionIdDecorator && brokerConfig.version !== 'V2') {
       messageText = `${messageText}. sessionId=${sessionId}`
     }
 

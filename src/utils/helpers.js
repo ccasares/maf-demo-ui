@@ -70,8 +70,8 @@ export const createBrokerMessage = (text, conversationId = null, sessionId = nul
     }
   }
   
-  // Add sessionId to metadata if provided
-  if (sessionId) {
+  // Add sessionId to metadata if provided (V1 only)
+  if (!isV2 && sessionId) {
     payload.params.metadata.sessionId = sessionId
   }
   
